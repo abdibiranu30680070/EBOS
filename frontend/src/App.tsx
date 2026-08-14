@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import { Menu, X } from 'lucide-react';
 import { EbosLogo } from './components/common/EbosLogo.jsx';
 import { API_BASE_URL } from './lib/constants.js';
+import { PosPage } from './features/pos/PosPage.jsx';
 
 // Utility for collision-free local ID generation
 const generateId = (prefix: string) => {
@@ -319,8 +320,23 @@ export default function App() {
 
       // Trigger sync in background immediately
       syncNow();
+
+      return {
+        ...newOrder,
+        businessName: user.businessName || 'Mercato Wholesale Traders',
+        branchName: user.branchName || 'Mercato Main Store',
+        customerName: customer ? customer.name : null,
+        items: cart.map(item => ({
+          productId: item.product.id,
+          name: item.product.name,
+          quantity: item.quantity,
+          unitPrice: item.product.sellingPrice,
+          totalPrice: item.product.sellingPrice * item.quantity,
+        })),
+      };
     } catch (err: any) {
       setCheckoutError(`Error saving order: ${err.message}`);
+      return null;
     }
   };
 
@@ -689,167 +705,29 @@ export default function App() {
 
         {/* 2. CHECKOUT POS VIEW */}
         {activeTab === 'pos' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
-            {/* Product Catalog */}
-            <div className="lg:col-span-2 flex flex-col gap-4 overflow-y-auto pr-2">
-              <div className="sticky top-0 bg-slate-50 pb-2 z-5">
-                <input
-                  type="text"
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
-                  placeholder="🔍 Search product catalog by name or SKU..."
-                  value={posSearch}
-                  onChange={(e) => setPosSearch(e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {filteredProducts.map((p) => {
-                    const stock = stockBalances[p.id] || 0;
-                    const isLow = stock < p.minStockLevel;
-                    return (
-                      <div
-                        key={p.id}
-                        className="bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-blue-500 hover:shadow-md transition duration-150 flex flex-col justify-between h-36"
-                        onClick={() => addToCart(p)}
-                      >
-                        <div>
-                          <div className="font-bold text-slate-800 text-sm line-clamp-2">{p.name}</div>
-                          <div className="text-xs text-slate-400 font-mono mt-0.5">{p.sku}</div>
-                        </div>
-                        <div className="mt-3 pt-2 border-t border-slate-50 flex justify-between items-baseline">
-                          <div className="font-extrabold text-blue-600 text-sm">ETB {p.sellingPrice}</div>
-                          <div className={`text-xs ${isLow ? 'text-rose-600 font-bold' : 'text-slate-500'}`}>
-                            Stock: {stock}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-            </div>
-
-            {/* Shopping Cart / Terminal Checkout */}
-            <div className="bg-white border border-slate-200 rounded-2xl flex flex-col h-full shadow-sm overflow-hidden">
-              <div className="bg-slate-50 border-b border-slate-200 px-4 py-3.5 font-bold text-slate-800 text-sm">
-                🛒 Cart Terminal
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {checkoutError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg">
-                    <span>⚠️ {checkoutError}</span>
-                  </div>
-                )}
-
-                {cart.length === 0 ? (
-                  <div className="text-center text-slate-400 text-sm mt-12">
-                    Cart is empty.<br />Click catalog products to check out.
-                  </div>
-                ) : (
-                  cart.map((item) => (
-                    <div key={item.product.id} className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <div className="flex-1 pr-3">
-                        <div className="font-semibold text-slate-800 text-sm line-clamp-1">{item.product.name}</div>
-                        <div className="text-xs text-slate-400">
-                          ETB {item.product.sellingPrice} × {item.quantity}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button className="w-7 h-7 bg-slate-100 hover:bg-slate-250 text-slate-800 rounded font-bold cursor-pointer" onClick={() => updateCartQty(item.product.id, -1)}>-</button>
-                        <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
-                        <button className="w-7 h-7 bg-slate-100 hover:bg-slate-250 text-slate-800 rounded font-bold cursor-pointer" onClick={() => addToCart(item.product)}>+</button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-3">
-                {/* Customer Select */}
-                <div>
-                  <div className="flex justify-between text-xs font-semibold text-slate-500 uppercase mb-1.5">
-                    <span>Client Account</span>
-                    <span
-                      className="text-blue-600 hover:underline cursor-pointer normal-case"
-                      onClick={() => setShowAddCustomer(true)}
-                    >
-                      + Create Customer
-                    </span>
-                  </div>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm"
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  >
-                    <option value="">-- Walk-in Cash Customer --</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} (Outstanding: ETB {c.outstandingBalance})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Payment Mode */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Payment Method</label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm"
-                    value={paymentMode}
-                    onChange={(e) => setPaymentMode(e.target.value as any)}
-                  >
-                    <option value="CASH">Cash Payment</option>
-                    <option value="TELEBIRR">Telebirr Mobile Payment</option>
-                    <option value="CBE_BIRR">CBE Birr Mobile Payment</option>
-                    <option value="BANK_TRANSFER">Bank Transfer</option>
-                    <option value="CREDIT">Business Credit Ledger</option>
-                  </select>
-                </div>
-
-                {/* Pricing summaries */}
-                <div className="space-y-1.5 text-sm border-t border-slate-200/60 pt-3">
-                  <div className="flex justify-between text-slate-500">
-                    <span>Subtotal</span>
-                    <span>ETB {cartSubtotal}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center text-slate-500">
-                    <span>Discount (ETB)</span>
-                    <input
-                      type="number"
-                      className="w-20 text-right px-2 py-0.5 border border-slate-200 bg-white rounded text-sm text-slate-800"
-                      value={discountAmount}
-                      onChange={(e) => setDiscountAmount(Number(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="flex justify-between items-center text-slate-500">
-                    <span>Paid Amount (ETB)</span>
-                    <input
-                      type="number"
-                      disabled={paymentMode === 'CREDIT'}
-                      className="w-20 text-right px-2 py-0.5 border border-slate-200 bg-white rounded text-sm text-slate-800 disabled:bg-slate-100 disabled:text-slate-500"
-                      value={paidAmount}
-                      onChange={(e) => setPaidAmount(Number(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="flex justify-between font-extrabold text-slate-900 text-base border-t border-dashed border-slate-200 pt-2">
-                    <span>Total Net</span>
-                    <span>ETB {cartTotal.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleCheckout}
-                  disabled={cart.length === 0}
-                  className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer disabled:opacity-50"
-                >
-                  Confirm Order & Receipt
-                </button>
-              </div>
-            </div>
-          </div>
+          <PosPage
+            products={products}
+            customers={customers}
+            stockBalances={stockBalances}
+            user={user}
+            cartHook={{
+              cart,
+              addToCart,
+              updateCartQty,
+              selectedCustomerId,
+              setSelectedCustomerId,
+              discountAmount,
+              setDiscountAmount,
+              paidAmount,
+              setPaidAmount,
+              paymentMode,
+              setPaymentMode,
+              cartSubtotal,
+              cartTotal,
+              checkoutError,
+              handleCheckout,
+            }}
+          />
         )}
 
         {/* 3. INVENTORY ADJUSTMENT VIEW */}

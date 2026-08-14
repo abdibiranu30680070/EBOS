@@ -7,6 +7,7 @@
 
 import { Modal } from '../../components/ui/Modal.jsx';
 import { PAYMENT_MODE_COLORS } from '../../lib/constants.js';
+import { EbosLogo } from '../../components/common/EbosLogo.jsx';
 
 function ReceiptRow({ label, value, bold, large }) {
   return (
@@ -29,8 +30,10 @@ export function ReceiptModal({ isOpen, onClose, order }) {
     <Modal isOpen={isOpen} onClose={onClose} title="Sale Receipt" size="sm">
       <div id="receipt-content" className="space-y-4">
         {/* Business header */}
-        <div className="text-center pb-3 border-b border-dashed border-slate-200">
-          <div className="text-2xl mb-1">💼</div>
+        <div className="text-center pb-3 border-b border-dashed border-slate-200 flex flex-col items-center">
+          <div className="mb-2">
+            <EbosLogo size="sm" showText={false} />
+          </div>
           <h2 className="font-extrabold text-slate-900 text-base">{order.businessName ?? 'EBOS Business'}</h2>
           <p className="text-xs text-slate-400">{order.branchName ?? 'Main Branch'}</p>
           <p className="text-xs text-slate-400 mt-1">
