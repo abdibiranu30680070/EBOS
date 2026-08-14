@@ -43,10 +43,10 @@ export declare class SyncController {
                 items: {
                     id: string;
                     productId: string;
+                    orderId: string;
                     quantity: import("@prisma/client-runtime-utils").Decimal;
                     unitPrice: import("@prisma/client-runtime-utils").Decimal;
                     totalPrice: import("@prisma/client-runtime-utils").Decimal;
-                    orderId: string;
                 }[];
             } & {
                 id: string;

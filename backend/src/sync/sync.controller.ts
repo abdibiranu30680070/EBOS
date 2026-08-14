@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { MovementType, PaymentMode } from '@prisma/client';
+// NOTE: don't import generated enum types directly; fall back to runtime values/casts
 
 @Controller('api/v1/sync')
 @UseGuards(JwtAuthGuard)
@@ -71,7 +71,7 @@ export class SyncController {
     const { businessId, branchId, sub: userId } = req.user;
     const { customers = [], salesOrders = [], inventoryMovements = [], payments = [] } = body;
 
-    const results = await this.prisma.$transaction(async (tx) => {
+    const results = await this.prisma.$transaction(async (tx: any) => {
       const syncedCustomerIds: string[] = [];
       const syncedOrderIds: string[] = [];
       const syncedMovementIds: string[] = [];
@@ -117,7 +117,7 @@ export class SyncController {
               totalAmount: order.totalAmount,
               discountAmount: order.discountAmount || 0,
               paidAmount: order.paidAmount || 0,
-              paymentMode: order.paymentMode as PaymentMode,
+              paymentMode: order.paymentMode as any,
               createdAt: new Date(order.createdAt),
             },
           });
@@ -167,7 +167,7 @@ export class SyncController {
               businessId,
               customerId: payment.customerId,
               amount: payment.amount,
-              paymentMode: payment.paymentMode as PaymentMode,
+              paymentMode: payment.paymentMode as any,
               referenceNumber: payment.referenceNumber || null,
               createdById: userId,
               createdAt: new Date(payment.createdAt),
@@ -200,7 +200,7 @@ export class SyncController {
               branchId,
               productId: movement.productId,
               quantityDelta: movement.quantityDelta,
-              type: movement.type as MovementType,
+              type: movement.type as any,
               referenceId: movement.referenceId || null,
               notes: movement.notes || null,
               createdById: userId,
