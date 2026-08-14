@@ -44,6 +44,32 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
       });
     }
 
+    // Sync pending local users
+    const pendingUsers = await db.users.where('syncStatus').equals('PENDING').toArray().catch(() => []);
+    if (pendingUsers && pendingUsers.length > 0) {
+      for (const u of pendingUsers) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: u.username,
+              password: u.password || 'default123',
+              fullName: u.username,
+              role: u.role || 'CASHIER',
+              businessId: u.businessId || 'bus_mercato_001',
+              branchId: u.branchId || 'br_mercato_main',
+            }),
+          });
+          if (res.ok || res.status === 400 || res.status === 409) {
+            await db.users.update(u.id, { syncStatus: 'SYNCED' });
+          }
+        } catch (err) {
+          console.warn('Failed to push pending user:', u.username, err);
+        }
+      }
+    }
+
     if (
       pendingCustomers.length > 0 ||
       ordersWithItems.length > 0 ||
