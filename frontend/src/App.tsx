@@ -5,6 +5,7 @@ import { syncNow, startAutoSync, stopAutoSync } from './syncEngine';
 import Dashboard from './components/Dashboard';
 import { Menu, X } from 'lucide-react';
 import { EbosLogo } from './components/common/EbosLogo.jsx';
+import { API_BASE_URL } from './lib/constants.js';
 
 // Utility for collision-free local ID generation
 const generateId = (prefix: string) => {
@@ -117,7 +118,7 @@ export default function App() {
     // If online, login via backend API
     if (isOnline) {
       try {
-        const res = await fetch('http://localhost:3000/api/v1/auth/login', {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

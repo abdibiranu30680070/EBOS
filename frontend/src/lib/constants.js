@@ -3,9 +3,17 @@
 // Central config: API URL, payment modes, nav tabs
 // ─────────────────────────────────────────────
 
-export const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3000' 
-  : `http://${window.location.hostname}:3000`;
+const getEnvApiUrl = () => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:3000';
+  }
+  return '';
+};
+
+export const API_BASE_URL = getEnvApiUrl();
 
 export const PAYMENT_MODES = [
   { value: 'CASH',          label: 'Cash' },
