@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 240" width="100%" height="100%">
+  <defs>
+    <linearGradient id="ebos-primary" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="50%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+
+    <linearGradient id="ebos-gold" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#FBBF24"/>
+    </linearGradient>
+
+    <filter id="ebos-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Emblem Icon (Left) -->
+  <g transform="translate(120, 120)" filter="url(#ebos-glow)">
+    <!-- Hexagonal Outer Shield -->
+    <path d="M 0 -80 L 65 -42 L 65 35 L 0 75 L -65 35 L -65 -42 Z" 
+          fill="none" 
+          stroke="url(#ebos-primary)" 
+          stroke-width="14" 
+          stroke-linejoin="round"
+          stroke-linecap="round"/>
+
+    <!-- 'E' Monogram & Growth Bars -->
+    <path d="M -38 -42 L -38 42" stroke="url(#ebos-primary)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M -38 -35 L 35 -35" stroke="url(#ebos-primary)" stroke-width="13" stroke-linecap="round"/>
+    <path d="M -38 0 L 18 0" fill="none" stroke="url(#ebos-gold)" stroke-width="13" stroke-linecap="round"/>
+    <path d="M -38 35 L 40 35" stroke="url(#ebos-primary)" stroke-width="13" stroke-linecap="round"/>
+    
+    <circle cx="40" cy="-35" r="7" fill="url(#ebos-gold)"/>
+  </g>
+
+  <!-- Brand Text (Right) -->
+  <g transform="translate(230, 0)">
+    <!-- Main Title: EBOS -->
+    <text x="0" y="135" 
+          font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-weight="900" 
+          font-size="95" 
+          letter-spacing="4"
+          fill="url(#ebos-primary)">EBOS</text>
+
+    <!-- Golden Sparkle Dot on top of title -->
+    <circle cx="310" cy="65" r="9" fill="url(#ebos-gold)"/>
+
+    <!-- Tagline: ETHIOPIAN BUSINESS OS -->
+    <text x="5" y="178" 
+          font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-weight="700" 
+          font-size="22" 
+          letter-spacing="6"
+          fill="#94A3B8">ETHIOPIAN BUSINESS OS</text>
+  </g>
+</svg>

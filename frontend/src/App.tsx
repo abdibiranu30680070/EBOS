@@ -4,6 +4,7 @@ import { db, type LocalProduct, type LocalSalesOrder } from './db';
 import { syncNow, startAutoSync, stopAutoSync } from './syncEngine';
 import Dashboard from './components/Dashboard';
 import { Menu, X } from 'lucide-react';
+import { EbosLogo } from './components/common/EbosLogo.jsx';
 
 // Utility for collision-free local ID generation
 const generateId = (prefix: string) => {
@@ -440,8 +441,9 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-slate-100 font-sans">
         <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-8">
-          <h2 className="text-3xl font-extrabold text-center tracking-tight text-white mb-2">💼 EBOS Portal</h2>
-          <p className="text-sm text-slate-400 text-center mb-6">Ethiopian Business Operating System</p>
+          <div className="flex justify-center mb-3">
+            <EbosLogo size="lg" showText={true} />
+          </div>
           
           {authError && (
             <div className="mb-4 p-3.5 bg-rose-950/50 border border-rose-800 rounded-lg text-rose-200 text-sm flex items-center gap-2">
@@ -532,7 +534,7 @@ export default function App() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex flex-col md:flex-row justify-between items-center sticky top-0 z-10 shadow-sm gap-4">
         <div className="flex items-center justify-between w-full md:w-auto">
           <div className="flex items-center gap-3">
-            <span className="text-xl font-bold text-gradient">💼 EBOS</span>
+            <EbosLogo size="md" showText={true} />
             <span className="text-sm bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-medium hidden sm:inline-block">
               {user.businessName} - {user.branchName || 'Central'}
             </span>

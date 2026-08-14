@@ -4,7 +4,8 @@
 // ─────────────────────────────────────────────
 
 import { usePendingSync } from '../../hooks/usePendingSync.js';
-import { MODULES } from '../../lib/constants.js';
+import { MODULES }        from '../../lib/constants.js';
+import { EbosLogo }       from '../common/EbosLogo.jsx';
 
 export function Header({ user, isOnline, syncing, activeModule, onModuleChange, onSync, onLogout, onToggleSidebar }) {
   const { pendingCount, hasPending } = usePendingSync();
@@ -21,8 +22,8 @@ export function Header({ user, isOnline, syncing, activeModule, onModuleChange, 
         </button>
 
         <div className="flex items-center gap-3 py-3">
-          <span className="text-xl font-extrabold text-blue-400 tracking-tight hidden sm:inline">💼 EBOS</span>
-          <span className="text-xl font-extrabold text-blue-400 tracking-tight sm:hidden">💼</span>
+          <EbosLogo size="md" showText={true} className="hidden sm:flex" />
+          <EbosLogo size="sm" showText={false} className="sm:hidden" />
         </div>
 
         {/* Module Switcher */}

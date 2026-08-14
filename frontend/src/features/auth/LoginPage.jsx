@@ -5,7 +5,8 @@
 // ─────────────────────────────────────────────
 
 import { useState } from 'react';
-import { Alert }     from '../../components/ui/Alert.jsx';
+import { Alert }    from '../../components/ui/Alert.jsx';
+import { EbosLogo } from '../../components/common/EbosLogo.jsx';
 
 export function LoginPage({ isOnline, onLogin, authError, syncMessage }) {
   const [businessId, setBusinessId] = useState('bus_mercato_001');
@@ -32,10 +33,11 @@ export function LoginPage({ isOnline, onLogin, authError, syncMessage }) {
         {/* Card */}
         <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
           {/* Brand strip */}
-          <div className="bg-blue-600 px-8 py-6 text-center">
-            <div className="text-4xl mb-2">💼</div>
-            <h1 className="text-2xl font-extrabold text-white tracking-tight">EBOS Portal</h1>
-            <p className="text-blue-200 text-sm mt-1">Ethiopian Business Operating System</p>
+          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 border-b border-slate-700 px-8 py-8 flex flex-col items-center justify-center text-center">
+            <EbosLogo size="lg" showText={true} className="mb-2" />
+            <p className="text-slate-400 text-xs mt-2 font-medium tracking-wide">
+              Ethiopian Business Operating System
+            </p>
           </div>
 
           <div className="p-8 space-y-5">
