@@ -1,213 +1,319 @@
 import React from 'react';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Users, Package, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db';
+import { 
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import { 
+  TrendingUp, DollarSign, Users, Package, AlertTriangle, 
+  CheckCircle, Clock, ShoppingCart, ArrowUpRight, ArrowDownRight, Layers
+} from 'lucide-react';
 
 interface DashboardProps {
-  dailySalesTotal: number;
-  totalOutstandingReceivables: number;
-  lowStockItems: any[];
-  orders: any[];
-  customers: any[];
-  products: any[];
-  stockBalances: { [key: string]: number };
+  dailySalesTotal?: number;
+  totalOutstandingReceivables?: number;
+  lowStockItems?: any[];
+  orders?: any[];
+  customers?: any[];
+  products?: any[];
+  stockBalances?: { [key: string]: number };
 }
 
-const COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#ef4444'];
 
 export default function Dashboard({ 
-  dailySalesTotal, 
-  totalOutstandingReceivables, 
-  lowStockItems, 
-  orders, 
-  customers, 
-  products,
-  stockBalances 
+  dailySalesTotal: initialDailySales = 0, 
+  totalOutstandingReceivables: initialReceivables = 0, 
+  lowStockItems: initialLowStock = [], 
+  orders: initialOrders = [], 
+  customers: initialCustomers = [], 
+  products: initialProducts = [],
+  stockBalances: initialStockBalances = {} 
 }: DashboardProps) {
-  // Calculate weekly sales data
-  const weeklySalesData = React.useMemo(() => {
+  // Live IndexedDB Queries for Real-Time Updates
+  const liveOrders = useLiveQuery(() => db.salesOrders.toArray()) || initialOrders;
+  const liveProducts = useLiveQuery(() => db.products.toArray()) || initialProducts;
+  const liveCustomers = useLiveQuery(() => db.customers.toArray()) || initialCustomers;
+  const liveMovements = useLiveQuery(() => db.inventoryMovements.toArray()) || [];
+  const liveOrderItems = useLiveQuery(() => db.salesOrderItems.toArray()) || [];
+
+  // Live Stock Balances Map
+  const liveStockBalances = React.useMemo(() => {
+    const map: { [productId: string]: number } = {};
+    liveMovements.forEach(m => {
+      map[m.productId] = (map[m.productId] || 0) + Number(m.quantityDelta || 0);
+    });
+    return Object.keys(map).length > 0 ? map : initialStockBalances;
+  }, [liveMovements, initialStockBalances]);
+
+  // Live Low Stock Items
+  const liveLowStock = React.useMemo(() => {
+    return liveProducts.filter(p => {
+      const bal = liveStockBalances[p.id] || 0;
+      return bal <= (p.minStockLevel || 5);
+    });
+  }, [liveProducts, liveStockBalances]);
+
+  // Financial Live Summary Metrics
+  const metrics = React.useMemo(() => {
+    const todayStr = new Date().toDateString();
+    
+    // Total Sales Value (All Time)
+    const totalSalesValue = liveOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+
+    // Today's Sales Value
+    const todaysSalesValue = liveOrders
+      .filter(o => new Date(o.createdAt).toDateString() === todayStr)
+      .reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+
+    // Total Purchase / Stock In Value (Inventory Restock Cost)
+    const totalPurchaseValue = liveMovements
+      .filter(m => m.type === 'STOCK_IN')
+      .reduce((sum, m) => {
+        const prod = liveProducts.find(p => p.id === m.productId);
+        const cost = prod ? Number(prod.costPrice || 0) : 0;
+        return sum + (Number(m.quantityDelta || 0) * cost);
+      }, 0);
+
+    // Estimated Product Cost of Goods Sold (COGS)
+    let estimatedCOGS = 0;
+    liveOrderItems.forEach(item => {
+      const prod = liveProducts.find(p => p.id === item.productId);
+      if (prod) {
+        estimatedCOGS += Number(item.quantity || 0) * Number(prod.costPrice || 0);
+      }
+    });
+
+    // Gross Sales Profit
+    const grossSalesProfit = Math.max(0, totalSalesValue - estimatedCOGS);
+
+    // Outstanding Credit Receivables
+    const outstandingReceivables = liveCustomers.reduce(
+      (sum, c) => sum + Number(c.outstandingBalance || 0), 
+      0
+    );
+
+    return {
+      totalSalesValue,
+      todaysSalesValue,
+      totalPurchaseValue,
+      estimatedCOGS,
+      grossSalesProfit,
+      outstandingReceivables,
+    };
+  }, [liveOrders, liveProducts, liveMovements, liveOrderItems, liveCustomers]);
+
+  // 7-Day Live Sales vs Purchase Value Chart Data
+  const salesVsPurchaseData = React.useMemo(() => {
     const data = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateStr = date.toDateString();
-      const dayTotal = orders
+
+      // Sales Value for day
+      const daySales = liveOrders
         .filter(o => new Date(o.createdAt).toDateString() === dateStr)
-        .reduce((sum, o) => sum + o.totalAmount, 0);
+        .reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+
+      // Purchase Value for day (Stock In)
+      const dayPurchase = liveMovements
+        .filter(m => m.type === 'STOCK_IN' && new Date(m.createdAt).toDateString() === dateStr)
+        .reduce((sum, m) => {
+          const prod = liveProducts.find(p => p.id === m.productId);
+          const cost = prod ? Number(prod.costPrice || 0) : 0;
+          return sum + (Number(m.quantityDelta || 0) * cost);
+        }, 0);
+
       data.push({
         day: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        sales: dayTotal,
+        SalesValue: daySales,
+        PurchaseValue: dayPurchase,
       });
     }
     return data;
-  }, [orders]);
+  }, [liveOrders, liveMovements, liveProducts]);
 
-  // Calculate sales by payment method
+  // Live Sales by Payment Method Data
   const paymentMethodData = React.useMemo(() => {
     const methods: { [key: string]: number } = {};
-    orders.forEach(o => {
-      methods[o.paymentMode] = (methods[o.paymentMode] || 0) + o.totalAmount;
+    liveOrders.forEach(o => {
+      const mode = o.paymentMode || 'CASH';
+      methods[mode] = (methods[mode] || 0) + Number(o.totalAmount || 0);
     });
     return Object.entries(methods).map(([method, total]) => ({
       name: method,
       value: total,
     }));
-  }, [orders]);
+  }, [liveOrders]);
 
-  // Calculate top selling products
-  const topProducts = React.useMemo(() => {
-    const productSales: { [key: string]: { name: string; total: number } } = {};
-    orders.forEach(o => {
-      // This would need to be enhanced with actual order items data
+  // Top Selling Products Report Data
+  const topSellingProductsReport = React.useMemo(() => {
+    const salesMap: { [productId: string]: { name: string; sku: string; costPrice: number; sellingPrice: number; qtySold: number; totalSalesValue: number } } = {};
+
+    liveOrderItems.forEach(item => {
+      const prod = liveProducts.find(p => p.id === item.productId);
+      const name = prod?.name || `Product ${item.productId.substring(0, 6)}`;
+      const sku = prod?.sku || 'N/A';
+      const costPrice = Number(prod?.costPrice || 0);
+      const sellingPrice = Number(prod?.sellingPrice || item.unitPrice || 0);
+
+      if (!salesMap[item.productId]) {
+        salesMap[item.productId] = {
+          name,
+          sku,
+          costPrice,
+          sellingPrice,
+          qtySold: 0,
+          totalSalesValue: 0,
+        };
+      }
+
+      salesMap[item.productId].qtySold += Number(item.quantity || 0);
+      salesMap[item.productId].totalSalesValue += Number(item.totalPrice || (item.quantity * item.unitPrice) || 0);
     });
-    return Object.values(productSales).sort((a, b) => b.total - a.total).slice(0, 5);
-  }, [orders]);
 
-  // Calculate customer credit distribution
-  const creditDistribution = React.useMemo(() => {
-    const highCredit = customers.filter(c => c.outstandingBalance > 10000).length;
-    const mediumCredit = customers.filter(c => c.outstandingBalance > 1000 && c.outstandingBalance <= 10000).length;
-    const lowCredit = customers.filter(c => c.outstandingBalance > 0 && c.outstandingBalance <= 1000).length;
-    const noCredit = customers.filter(c => c.outstandingBalance === 0).length;
-    return [
-      { name: 'High (>10K)', value: highCredit },
-      { name: 'Medium (1K-10K)', value: mediumCredit },
-      { name: 'Low (0-1K)', value: lowCredit },
-      { name: 'No Credit', value: noCredit },
-    ];
-  }, [customers]);
-
-  const MetricCard = ({ 
-    title, 
-    value, 
-    icon: Icon, 
-    trend, 
-    trendValue, 
-    color 
-  }: { 
-    title: string; 
-    value: string | number; 
-    icon: any; 
-    trend?: 'up' | 'down'; 
-    trendValue?: string;
-    color: string;
-  }) => (
-    <div className="card-premium p-6 relative overflow-hidden group">
-      <div className={`absolute top-0 right-0 w-32 h-32 ${color} opacity-10 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500`} />
-      <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 rounded-xl ${color} bg-opacity-20`}>
-            <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
-          </div>
-          {trend && (
-            <div className={`flex items-center gap-1 text-sm font-semibold ${
-              trend === 'up' ? 'text-emerald-600' : 'text-rose-600'
-            }`}>
-              {trend === 'up' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-              <span>{trendValue}</span>
-            </div>
-          )}
-        </div>
-        <div className="text-sm font-medium text-slate-500 mb-1">{title}</div>
-        <div className="text-3xl font-bold text-slate-900">{value}</div>
-      </div>
-    </div>
-  );
+    return Object.values(salesMap)
+      .sort((a, b) => b.totalSalesValue - a.totalSalesValue)
+      .slice(0, 6);
+  }, [liveOrderItems, liveProducts]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gradient">Dashboard Overview</h2>
-          <p className="text-slate-500 mt-1">Real-time business analytics and insights</p>
+          <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
+            📊 Sales & Purchase Analytics Report
+          </h2>
+          <p className="text-slate-500 text-sm mt-0.5">Live real-time revenue, stock purchases, and product sales insights</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
-            <Clock className="w-4 h-4 text-slate-400" />
-            <span className="text-sm text-slate-600">Last updated: {new Date().toLocaleTimeString()}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            Live Data Feed Active
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-xl border border-slate-200 text-xs text-slate-500">
+            <Clock className="w-3.5 h-3.5" />
+            <span>Updated: {new Date().toLocaleTimeString()}</span>
           </div>
         </div>
       </div>
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Today's Sales"
-          value={`ETB ${dailySalesTotal.toLocaleString()}`}
-          icon={DollarSign}
-          trend="up"
-          trendValue="+12.5%"
-          color="bg-indigo-500"
-        />
-        <MetricCard
-          title="Outstanding Credit"
-          value={`ETB ${totalOutstandingReceivables.toLocaleString()}`}
-          icon={Users}
-          color="bg-purple-500"
-        />
-        <MetricCard
-          title="Total Products"
-          value={products.length}
-          icon={Package}
-          color="bg-cyan-500"
-        />
-        <MetricCard
-          title="Low Stock Alerts"
-          value={lowStockItems.length}
-          icon={AlertTriangle}
-          color={lowStockItems.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}
-        />
+      {/* Primary Financial Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {/* Total Sales Value */}
+        <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-indigo-100 text-xs font-bold uppercase tracking-wider">Total Sales Value</span>
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+              <DollarSign className="w-5 h-5 text-white" />
+            </div>
+          </div>
+          <div className="mt-3 text-3xl font-extrabold">
+            ETB {metrics.totalSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </div>
+          <div className="mt-2 text-xs text-indigo-100 flex items-center gap-1">
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
+            <span>Today: ETB {metrics.todaysSalesValue.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Total Purchase Restock Value */}
+        <div className="bg-gradient-to-br from-blue-600 to-cyan-700 text-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-blue-100 text-xs font-bold uppercase tracking-wider">Stock Purchase Value</span>
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+              <ShoppingCart className="w-5 h-5 text-white" />
+            </div>
+          </div>
+          <div className="mt-3 text-3xl font-extrabold">
+            ETB {metrics.totalPurchaseValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </div>
+          <div className="mt-2 text-xs text-blue-100">
+            📦 Total Inventory Stock Restock Cost
+          </div>
+        </div>
+
+        {/* Estimated Gross Sales Profit */}
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Estimated Profit Margin</span>
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+              <ArrowUpRight className="w-5 h-5 text-white" />
+            </div>
+          </div>
+          <div className="mt-3 text-3xl font-extrabold">
+            ETB {metrics.grossSalesProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </div>
+          <div className="mt-2 text-xs text-emerald-100">
+            📈 Net Profit Value (Sales Revenue - Product Cost)
+          </div>
+        </div>
+
+        {/* Outstanding Receivables */}
+        <div className="bg-gradient-to-br from-purple-600 to-indigo-800 text-white rounded-2xl p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-purple-100 text-xs font-bold uppercase tracking-wider">Customer Receivables</span>
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+              <Users className="w-5 h-5 text-white" />
+            </div>
+          </div>
+          <div className="mt-3 text-3xl font-extrabold">
+            ETB {metrics.outstandingReceivables.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </div>
+          <div className="mt-2 text-xs text-purple-100">
+            💳 Outstanding Uncollected Credit Balances
+          </div>
+        </div>
       </div>
 
-      {/* Charts Row */}
+      {/* Charts Section: Sales vs Purchase Value */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Weekly Sales Chart */}
-        <div className="card-premium p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-indigo-500" />
-            Weekly Sales Trend
+        {/* Weekly Sales vs Purchase Trend */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-indigo-600" />
+              Live Sales Value vs Stock Purchase Trend (7 Days)
+            </span>
           </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={weeklySalesData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="day" stroke="#64748b" />
-              <YAxis stroke="#64748b" />
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={salesVsPurchaseData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="day" stroke="#64748b" fontSize={12} />
+              <YAxis stroke="#64748b" fontSize={12} />
               <Tooltip 
                 contentStyle={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  backgroundColor: '#ffffff', 
                   borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  border: '1px solid #cbd5e1',
+                  boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
                 }}
               />
               <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="sales" 
-                stroke="#6366f1" 
-                strokeWidth={3}
-                dot={{ fill: '#6366f1', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
+              <Bar dataKey="SalesValue" name="Sales Revenue (ETB)" fill="#6366f1" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="PurchaseValue" name="Stock Purchase Cost (ETB)" fill="#06b6d4" radius={[6, 6, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Payment Methods Chart */}
-        <div className="card-premium p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-purple-500" />
-            Sales by Payment Method
+        {/* Payment Methods Distribution */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-emerald-600" />
+            Live Sales Revenue by Payment Channel
           </h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
                 data={paymentMethodData}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={100}
+                innerRadius={65}
+                outerRadius={95}
                 paddingAngle={5}
                 dataKey="value"
               >
@@ -217,10 +323,9 @@ export default function Dashboard({
               </Pie>
               <Tooltip 
                 contentStyle={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  backgroundColor: '#ffffff', 
                   borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  border: '1px solid #cbd5e1'
                 }}
               />
               <Legend />
@@ -229,140 +334,85 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Tables Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Orders */}
-        <div className="card-premium p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Package className="w-5 h-5 text-cyan-500" />
-            Recent Sales Orders
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Order ID</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Method</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400">
-                      <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>No sales transactions yet</p>
-                    </td>
-                  </tr>
-                ) : (
-                  orders.slice(0, 5).map((o) => (
-                    <tr key={o.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 px-4 font-mono text-sm text-slate-600">{o.id.substring(0, 12)}...</td>
-                      <td className="py-3 px-4 font-semibold text-slate-900">ETB {o.totalAmount.toLocaleString()}</td>
-                      <td className="py-3 px-4">
-                        <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700 font-medium">
-                          {o.paymentMode}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`text-xs px-2 py-1 rounded-full font-semibold flex items-center gap-1 w-fit ${
-                          o.syncStatus === 'SYNCED' 
-                            ? 'bg-emerald-100 text-emerald-700' 
-                            : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {o.syncStatus === 'SYNCED' ? (
-                            <CheckCircle className="w-3 h-3" />
-                          ) : (
-                            <Clock className="w-3 h-3" />
-                          )}
-                          {o.syncStatus}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+      {/* Top Live Selling Products Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+              <Package className="w-5 h-5 text-indigo-600" />
+              Live Product Sales Performance Report
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Real-time breakdown of sold items, purchase costs, and sales revenue</p>
           </div>
+          <span className="text-xs bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full font-bold border border-indigo-100">
+            Live Product Sales
+          </span>
         </div>
 
-        {/* Low Stock Alerts */}
-        <div className="card-premium p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-rose-500" />
-            Stock Replenishment Alerts
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Product</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Current</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Minimum</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/50">
+                <th className="py-3.5 px-5 text-xs font-semibold text-slate-500 uppercase">Product Name</th>
+                <th className="py-3.5 px-5 text-xs font-semibold text-slate-500 uppercase">SKU</th>
+                <th className="py-3.5 px-5 text-xs font-semibold text-slate-500 uppercase text-right">Purchase (Cost)</th>
+                <th className="py-3.5 px-5 text-xs font-semibold text-slate-500 uppercase text-right">Sale Price</th>
+                <th className="py-3.5 px-5 text-xs font-semibold text-slate-500 uppercase text-center">Qty Sold</th>
+                <th className="py-3.5 px-5 text-xs font-semibold text-slate-500 uppercase text-right">Total Sales Value</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {topSellingProductsReport.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-400 text-sm">
+                    No product sales recorded yet. Completed sales orders will dynamically appear here in real-time.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {lowStockItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-emerald-600">
-                      <CheckCircle className="w-12 h-12 mx-auto mb-2" />
-                      <p className="font-semibold">All stock levels healthy</p>
+              ) : (
+                topSellingProductsReport.map(item => (
+                  <tr key={item.sku} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3.5 px-5 font-bold text-slate-800">{item.name}</td>
+                    <td className="py-3.5 px-5 text-slate-500 font-mono text-xs">{item.sku}</td>
+                    <td className="py-3.5 px-5 text-slate-600 text-right">ETB {item.costPrice.toLocaleString()}</td>
+                    <td className="py-3.5 px-5 font-semibold text-slate-800 text-right">ETB {item.sellingPrice.toLocaleString()}</td>
+                    <td className="py-3.5 px-5 text-center">
+                      <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full text-xs font-bold">
+                        {item.qtySold}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 font-bold text-indigo-600 text-right">
+                      ETB {item.totalSalesValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
-                ) : (
-                  lowStockItems.slice(0, 5).map((p) => {
-                    const bal = stockBalances[p.id] || 0;
-                    const isCritical = bal === 0;
-                    return (
-                      <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-slate-900">{p.name}</div>
-                          <div className="text-xs text-slate-400 font-mono">{p.sku}</div>
-                        </td>
-                        <td className="py-3 px-4 font-bold text-rose-600">{bal} {p.unitOfMeasure}</td>
-                        <td className="py-3 px-4 text-slate-500">{p.minStockLevel} {p.unitOfMeasure}</td>
-                        <td className="py-3 px-4">
-                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                            isCritical 
-                              ? 'bg-rose-100 text-rose-700' 
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {isCritical ? 'Critical' : 'Low'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Customer Credit Distribution */}
-      <div className="card-premium p-6">
-        <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-          <Users className="w-5 h-5 text-purple-500" />
-          Customer Credit Distribution
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {creditDistribution.map((item, index) => (
-            <div key={item.name} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-              <div className="text-sm text-slate-500 mb-1">{item.name}</div>
-              <div className="text-2xl font-bold text-slate-900">{item.value}</div>
-              <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-500" style={{ 
-                  width: `${(item.value / customers.length) * 100}%`,
-                  backgroundColor: COLORS[index % COLORS.length]
-                }} />
+      {/* Low Stock Alerts */}
+      {liveLowStock.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-amber-800 font-bold text-base mb-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600" />
+            Replenishment Alert ({liveLowStock.length} Low Stock Products)
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {liveLowStock.slice(0, 6).map(p => (
+              <div key={p.id} className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-slate-800 text-sm">{p.name}</div>
+                  <div className="text-xs text-slate-400 font-mono">{p.sku}</div>
+                </div>
+                <span className="bg-rose-100 text-rose-800 text-xs font-extrabold px-2.5 py-1 rounded-full">
+                  {liveStockBalances[p.id] || 0} {p.unitOfMeasure || 'units'}
+                </span>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
