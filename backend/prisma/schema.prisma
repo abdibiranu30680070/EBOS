@@ -1,0 +1,198 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Business {
+  id        String            @id
+  name      String
+  tin       String?           @unique
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  branches  Branch[]
+  users     User[]
+  products  Product[]
+  customers Customer[]
+  payments  CustomerPayment[]
+
+  @@map("businesses")
+}
+
+model Branch {
+  id                 String              @id
+  businessId         String              @map("business_id")
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name               String
+  location           String?
+  isActive           Boolean             @default(true) @map("is_active")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  users              User[]
+  inventoryMovements InventoryMovement[]
+  salesOrders        SalesOrder[]
+
+  @@map("branches")
+}
+
+enum UserRole {
+  SUPERADMIN
+  OWNER
+  BRANCH_MANAGER
+  CASHIER
+  WAREHOUSE
+}
+
+model User {
+  id                 String              @id
+  businessId         String              @map("business_id")
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branchId           String?             @map("branch_id")
+  branch             Branch?             @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  username           String
+  passwordHash       String              @map("password_hash")
+  role               UserRole            @default(CASHIER)
+  fullName           String              @map("full_name")
+  phoneNumber        String              @map("phone_number")
+  isActive           Boolean             @default(true) @map("is_active")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  inventoryMovements InventoryMovement[]
+  salesOrders        SalesOrder[]
+  payments           CustomerPayment[]
+
+  @@unique([businessId, username])
+  @@map("users")
+}
+
+model Product {
+  id                 String              @id
+  businessId         String              @map("business_id")
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  sku                String
+  name               String
+  costPrice          Decimal             @map("cost_price")
+  sellingPrice       Decimal             @map("selling_price")
+  minStockLevel      Decimal             @default(0.00) @map("min_stock_level")
+  unitOfMeasure      String              @default("Pcs") @map("unit_of_measure")
+  isActive           Boolean             @default(true) @map("is_active")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  inventoryMovements InventoryMovement[]
+  salesOrderItems    SalesOrderItem[]
+
+  @@unique([businessId, sku])
+  @@map("products")
+}
+
+enum MovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  SALE
+  RETURN
+}
+
+model InventoryMovement {
+  id            String       @id
+  branchId      String       @map("branch_id")
+  branch        Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  productId     String       @map("product_id")
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityDelta Decimal      @map("quantity_delta")
+  type          MovementType
+  referenceId   String?      @map("reference_id")
+  notes         String?
+  createdById   String?      @map("created_by_id")
+  createdBy     User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  @@map("inventory_movements")
+}
+
+model Customer {
+  id                 String            @id
+  businessId         String            @map("business_id")
+  business           Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name               String
+  phone              String?
+  creditLimit        Decimal           @default(0.0000) @map("credit_limit")
+  outstandingBalance Decimal           @default(0.0000) @map("outstanding_balance")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  salesOrders        SalesOrder[]
+  payments           CustomerPayment[]
+
+  @@map("customers")
+}
+
+enum PaymentMode {
+  CASH
+  TELEBIRR
+  CBE_BIRR
+  BANK_TRANSFER
+  CREDIT
+}
+
+model SalesOrder {
+  id             String           @id
+  branchId       String           @map("branch_id")
+  branch         Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  customerId     String?          @map("customer_id")
+  customer       Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  userId         String?          @map("user_id")
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  totalAmount    Decimal          @map("total_amount")
+  discountAmount Decimal          @default(0.0000) @map("discount_amount")
+  paidAmount     Decimal          @default(0.0000) @map("paid_amount")
+  paymentMode    PaymentMode      @default(CASH) @map("payment_mode")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  items          SalesOrderItem[]
+
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id         String     @id
+  orderId    String     @map("order_id")
+  order      SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String     @map("product_id")
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity   Decimal
+  unitPrice  Decimal    @map("unit_price")
+  totalPrice Decimal    @map("total_price")
+
+  @@map("sales_order_items")
+}
+
+model CustomerPayment {
+  id              String      @id
+  businessId      String      @map("business_id")
+  business        Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId      String      @map("customer_id")
+  customer        Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount          Decimal
+  paymentMode     PaymentMode @map("payment_mode")
+  referenceNumber String?     @map("reference_number")
+  createdById     String?     @map("created_by_id")
+  createdBy       User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@map("customer_payments")
+}
+
+model AuditLog {
+  id        String   @id
+  userId    String?  @map("user_id")
+  action    String
+  payload   String? // Store json as string for SQLite compatibility
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}

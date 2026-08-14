@@ -1,0 +1,16 @@
+{
+  "name": "EBOS - Ethiopian Business Operating System",
+  "short_name": "EBOS",
+  "description": "Offline-first POS and inventory management for Ethiopian SMEs.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/React_Native_Logo.png/512px-React_Native_Logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

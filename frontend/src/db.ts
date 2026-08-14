@@ -1,0 +1,102 @@
+import Dexie, { type Table } from 'dexie';
+
+// Define TS Interfaces for Frontend Local Database
+export interface LocalProduct {
+  id: string;
+  businessId: string;
+  sku: string;
+  name: string;
+  costPrice: number;
+  sellingPrice: number;
+  minStockLevel: number;
+  unitOfMeasure: string;
+  isActive: boolean;
+}
+
+export interface LocalCustomer {
+  id: string;
+  businessId: string;
+  name: string;
+  phone: string;
+  creditLimit: number;
+  outstandingBalance: number;
+  syncStatus: 'PENDING' | 'SYNCED' | 'FAILED';
+  errorMessage?: string;
+}
+
+export interface LocalInventoryMovement {
+  id: string;
+  branchId: string;
+  productId: string;
+  quantityDelta: number;
+  type: 'STOCK_IN' | 'STOCK_OUT' | 'ADJUSTMENT' | 'SALE' | 'RETURN';
+  referenceId?: string;
+  notes?: string;
+  createdById?: string;
+  createdAt: string;
+  syncStatus: 'PENDING' | 'SYNCED' | 'FAILED';
+}
+
+export interface LocalSalesOrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface LocalSalesOrder {
+  id: string;
+  branchId: string;
+  customerId: string | null;
+  userId: string | null;
+  totalAmount: number;
+  discountAmount: number;
+  paidAmount: number;
+  paymentMode: 'CASH' | 'TELEBIRR' | 'CBE_BIRR' | 'BANK_TRANSFER' | 'CREDIT';
+  createdAt: string;
+  syncStatus: 'PENDING' | 'SYNCED' | 'FAILED';
+  items?: LocalSalesOrderItem[]; // Helper for sync payloads
+}
+
+export interface LocalCustomerPayment {
+  id: string;
+  businessId: string;
+  customerId: string;
+  amount: number;
+  paymentMode: 'CASH' | 'TELEBIRR' | 'CBE_BIRR' | 'BANK_TRANSFER' | 'CREDIT';
+  referenceNumber?: string;
+  createdAt: string;
+  syncStatus: 'PENDING' | 'SYNCED' | 'FAILED';
+}
+
+export interface SyncMetadata {
+  key: string;
+  value: string;
+}
+
+class EbosDatabase extends Dexie {
+  products!: Table<LocalProduct>;
+  customers!: Table<LocalCustomer>;
+  inventoryMovements!: Table<LocalInventoryMovement>;
+  salesOrders!: Table<LocalSalesOrder>;
+  salesOrderItems!: Table<LocalSalesOrderItem>;
+  customerPayments!: Table<LocalCustomerPayment>;
+  syncMetadata!: Table<SyncMetadata>;
+
+  constructor() {
+    super('EbosDatabase');
+    this.version(1).stores({
+      products: 'id, businessId, sku, name',
+      customers: 'id, businessId, name, syncStatus',
+      inventoryMovements: 'id, branchId, productId, syncStatus, createdAt',
+      salesOrders: 'id, branchId, customerId, syncStatus, createdAt',
+      salesOrderItems: 'id, orderId, productId',
+      customerPayments: 'id, businessId, customerId, syncStatus, createdAt',
+      syncMetadata: 'key',
+    });
+  }
+}
+
+export const db = new EbosDatabase();
