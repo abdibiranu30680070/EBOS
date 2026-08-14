@@ -3,21 +3,33 @@
 // Props: isOpen, onClose, currentUser
 // ─────────────────────────────────────────────
 
-import { useState }  from 'react';
-import { Modal }     from '../../components/ui/Modal.jsx';
+import { useState }      from 'react';
+import { useLiveQuery }  from 'dexie-react-hooks';
+import { Modal }         from '../../components/ui/Modal.jsx';
 import { FormField, inputClass, selectClass } from '../../components/ui/FormField.jsx';
-import { db }        from '../../lib/db.js';
-import { generateId } from '../../lib/generateId.js';
-import { syncNow }   from '../../lib/syncEngine.js';
+import { db }            from '../../lib/db.js';
+import { generateId }    from '../../lib/generateId.js';
+import { API_BASE_URL }  from '../../lib/constants.js';
 
 export function AddUserModal({ isOpen, onClose, currentUser }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role,     setRole]     = useState('CASHIER');
-  const [error,    setError]    = useState('');
-  const [saving,   setSaving]   = useState(false);
+  const branches = useLiveQuery(() => db.branches.toArray()) || [
+    { id: 'br_mercato_main', name: 'Mercato Main Store' }
+  ];
 
-  const reset = () => { setUsername(''); setPassword(''); setRole('CASHIER'); setError(''); };
+  const [username, setUsername]                 = useState('');
+  const [password, setPassword]                 = useState('');
+  const [role,     setRole]                     = useState('CASHIER');
+  const [selectedBranchId, setSelectedBranchId] = useState(currentUser?.branchId || 'br_mercato_main');
+  const [error,    setError]                    = useState('');
+  const [saving,   setSaving]                   = useState(false);
+
+  const reset = () => {
+    setUsername('');
+    setPassword('');
+    setRole('CASHIER');
+    setSelectedBranchId(currentUser?.branchId || 'br_mercato_main');
+    setError('');
+  };
   const handleClose = () => { reset(); onClose(); };
 
   const handleSubmit = async (e) => {
@@ -28,20 +40,46 @@ export function AddUserModal({ isOpen, onClose, currentUser }) {
     }
 
     setSaving(true);
+    const userId     = generateId('usr');
+    const businessId = currentUser?.businessId || 'bus_mercato_001';
+    const branchId   = selectedBranchId || currentUser?.branchId || 'br_mercato_main';
+
+    let initialStatus = 'PENDING';
+
     try {
-      // Create user locally. In a real system, passwords should be hashed, 
-      // but we will sync this to the backend which handles actual authentication.
-      await db.users.add({
-        id:         generateId('usr'),
+      // Register user on backend server
+      if (navigator.onLine) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: username.trim(),
+              password: password.trim(),
+              fullName: username.trim(),
+              role: role,
+              businessId,
+              branchId,
+            }),
+          });
+          if (res.ok) {
+            initialStatus = 'SYNCED';
+          }
+        } catch (apiErr) {
+          console.warn('Backend user registration offline/failed, saving locally as PENDING', apiErr);
+        }
+      }
+
+      await db.users.put({
+        id:         userId,
         username:   username.trim(),
-        password:   password.trim(), // Placeholder for demo
+        password:   password.trim(),
         role:       role,
-        branchId:   currentUser?.branchId,
-        businessId: currentUser?.businessId,
-        syncStatus: 'PENDING',
+        branchId:   branchId,
+        businessId: businessId,
+        syncStatus: initialStatus,
       });
 
-      syncNow();
       reset();
       onClose();
     } catch (err) {
@@ -79,6 +117,21 @@ export function AddUserModal({ isOpen, onClose, currentUser }) {
             onChange={e => setPassword(e.target.value)}
             required
           />
+        </FormField>
+
+        <FormField label="Assigned Branch" required>
+          <select
+            id="usr-branch"
+            className={selectClass}
+            value={selectedBranchId}
+            onChange={e => setSelectedBranchId(e.target.value)}
+          >
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>
+                🏢 {b.name} ({b.id})
+              </option>
+            ))}
+          </select>
         </FormField>
 
         <FormField label="Role" required>

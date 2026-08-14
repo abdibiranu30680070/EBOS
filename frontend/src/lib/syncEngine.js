@@ -55,6 +55,32 @@ async function _pushPendingChanges() {
     })
   );
 
+  // Sync pending local users
+  const pendingUsers = await db.users.where('syncStatus').equals('PENDING').toArray().catch(() => []);
+  if (pendingUsers?.length) {
+    for (const u of pendingUsers) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: u.username,
+            password: u.password || 'default123',
+            fullName: u.username,
+            role: u.role || 'CASHIER',
+            businessId: u.businessId || 'bus_mercato_001',
+            branchId: u.branchId || 'br_mercato_main',
+          }),
+        });
+        if (res.ok || res.status === 400) {
+          await db.users.update(u.id, { syncStatus: 'SYNCED' });
+        }
+      } catch (err) {
+        console.warn('[SyncEngine] Failed to sync user:', u.username, err);
+      }
+    }
+  }
+
   const hasChanges =
     pendingCustomers.length > 0 ||
     ordersWithItems.length > 0 ||
@@ -62,7 +88,7 @@ async function _pushPendingChanges() {
     pendingMovements.length > 0;
 
   if (!hasChanges) {
-    console.log('[SyncEngine] No pending changes to push.');
+    console.log('[SyncEngine] No pending entity changes to push.');
     return;
   }
 
