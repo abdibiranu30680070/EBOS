@@ -1,7 +1,10 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole } from '../src/generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const connectionString = process.env.DATABASE_URL || 'postgresql://localhost:5432/postgres';
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('Seeding database...');
