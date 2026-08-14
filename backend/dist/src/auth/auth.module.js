@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthModule = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
+const config_1 = require("@nestjs/config");
 const auth_service_1 = require("./auth.service");
 const auth_controller_1 = require("./auth.controller");
 let AuthModule = class AuthModule {
@@ -17,9 +18,15 @@ exports.AuthModule = AuthModule;
 exports.AuthModule = AuthModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            jwt_1.JwtModule.register({
-                secret: process.env.JWT_SECRET || 'ebos_jwt_secret_key_2026',
-                signOptions: { expiresIn: '1d' },
+            jwt_1.JwtModule.registerAsync({
+                imports: [config_1.ConfigModule],
+                inject: [config_1.ConfigService],
+                useFactory: (config) => ({
+                    secret: config.get('JWT_SECRET', 'ebos_fallback_secret'),
+                    signOptions: {
+                        expiresIn: (config.get('JWT_EXPIRES_IN', '7d')),
+                    },
+                }),
             }),
         ],
         providers: [auth_service_1.AuthService],
