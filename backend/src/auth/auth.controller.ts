@@ -1,9 +1,33 @@
-import { Controller, Post, Body, UnauthorizedException, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  async register(@Body() body: any) {
+    const { username, password, fullName, businessId, branchId, role, phoneNumber } = body;
+    if (!username || !password || !fullName || !businessId) {
+      throw new BadRequestException('Username, password, fullName, and businessId are required');
+    }
+
+    const user = await this.authService.registerUser({
+      username,
+      password,
+      fullName,
+      businessId,
+      branchId,
+      role,
+      phoneNumber,
+    });
+
+    return {
+      message: 'User created successfully and is active.',
+      user,
+    };
+  }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -13,11 +37,14 @@ export class AuthController {
       throw new UnauthorizedException('Username, password, and businessId are required');
     }
 
-    const user = await this.authService.validateUser(username, password, businessId);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials or inactive user');
+    const result = await this.authService.validateUser(username, password, businessId);
+    if (!result || result.error === 'INVALID_CREDENTIALS') {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (result.error === 'INACTIVE_USER') {
+      throw new UnauthorizedException('User account is inactive. Please contact your administrator.');
     }
 
-    return this.authService.login(user);
+    return this.authService.login(result);
   }
 }
