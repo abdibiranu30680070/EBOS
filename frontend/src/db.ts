@@ -71,6 +71,15 @@ export interface LocalCustomerPayment {
   syncStatus: 'PENDING' | 'SYNCED' | 'FAILED';
 }
 
+export interface LocalBranch {
+  id: string;
+  businessId: string;
+  name: string;
+  location?: string;
+  isActive: boolean;
+  syncStatus?: 'PENDING' | 'SYNCED' | 'FAILED';
+}
+
 export interface SyncMetadata {
   key: string;
   value: string;
@@ -83,6 +92,7 @@ class EbosDatabase extends Dexie {
   salesOrders!: Table<LocalSalesOrder>;
   salesOrderItems!: Table<LocalSalesOrderItem>;
   customerPayments!: Table<LocalCustomerPayment>;
+  branches!: Table<LocalBranch>;
   syncMetadata!: Table<SyncMetadata>;
 
   constructor() {
@@ -94,6 +104,7 @@ class EbosDatabase extends Dexie {
       salesOrders: 'id, branchId, customerId, syncStatus, createdAt',
       salesOrderItems: 'id, orderId, productId',
       customerPayments: 'id, businessId, customerId, syncStatus, createdAt',
+      branches: 'id, businessId, name, isActive',
       syncMetadata: 'key',
     });
   }

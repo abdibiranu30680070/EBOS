@@ -25,6 +25,7 @@ class EbosDatabase extends Dexie {
       suppliers: 'id, businessId, name, syncStatus',
       purchaseOrders: 'id, branchId, supplierId, syncStatus, createdAt',
       purchaseOrderItems: 'id, orderId, productId',
+      branches: 'id, businessId, name, isActive',
     });
   }
 }

@@ -8,6 +8,7 @@ import { AuthModule }      from './auth/auth.module';
 import { ProductsModule }  from './products/products.module';
 import { CustomersModule } from './customers/customers.module';
 import { SyncModule }      from './sync/sync.module';
+import { BranchesModule }  from './branches/branches.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SyncModule }      from './sync/sync.module';
     ProductsModule,
     CustomersModule,
     SyncModule,
+    BranchesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

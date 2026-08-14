@@ -7,6 +7,7 @@ import { Menu, X } from 'lucide-react';
 import { EbosLogo } from './components/common/EbosLogo.jsx';
 import { API_BASE_URL } from './lib/constants.js';
 import { PosPage } from './features/pos/PosPage.jsx';
+import { SettingsPage } from './features/settings/SettingsPage.jsx';
 
 // Utility for collision-free local ID generation
 const generateId = (prefix: string) => {
@@ -24,7 +25,7 @@ export default function App() {
   const [authError, setAuthError] = useState('');
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'inventory' | 'customers'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'inventory' | 'customers' | 'settings'>('dashboard');
   
   // Mobile menu toggle
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -603,6 +604,15 @@ export default function App() {
           >
             👥 Customers
           </button>
+
+          <button
+            onClick={() => { setActiveTab('settings'); setSyncMessage(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'settings' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            ⚙️ Configuration
+          </button>
         </nav>
         
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
@@ -667,6 +677,15 @@ export default function App() {
             }`}
           >
             👥 Customers & Credit
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('settings'); setSyncMessage(null); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'settings' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            ⚙️ Configuration
           </button>
           
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500 mt-2">
@@ -921,6 +940,11 @@ export default function App() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* 5. CONFIGURATION & SETTINGS VIEW */}
+        {activeTab === 'settings' && (
+          <SettingsPage currentUser={user} />
         )}
       </main>
     </div>
