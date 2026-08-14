@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type LocalProduct, type LocalSalesOrder } from './db';
 import { syncNow, startAutoSync, stopAutoSync } from './syncEngine';
+import Dashboard from './components/Dashboard';
+import { Menu, X } from 'lucide-react';
 
 // Utility for collision-free local ID generation
 const generateId = (prefix: string) => {
@@ -20,6 +22,9 @@ export default function App() {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'inventory' | 'customers'>('dashboard');
+  
+  // Mobile menu toggle
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Network & Sync States
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -524,15 +529,64 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Top Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="text-xl font-bold text-blue-600">💼 EBOS</span>
-          <span className="text-sm bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-medium">
-            {user.businessName} - {user.branchName || 'Central'}
-          </span>
+      <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex flex-col md:flex-row justify-between items-center sticky top-0 z-10 shadow-sm gap-4">
+        <div className="flex items-center justify-between w-full md:w-auto">
+          <div className="flex items-center gap-3">
+            <span className="text-xl font-bold text-gradient">💼 EBOS</span>
+            <span className="text-sm bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-medium hidden sm:inline-block">
+              {user.businessName} - {user.branchName || 'Central'}
+            </span>
+          </div>
+          
+          {/* Mobile menu toggle */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6 text-slate-600" /> : <Menu className="w-6 h-6 text-slate-600" />}
+          </button>
         </div>
         
-        <div className="flex items-center gap-4">
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center gap-2">
+          <button
+            onClick={() => { setActiveTab('dashboard'); setSyncMessage(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            📊 Dashboard
+          </button>
+          
+          <button
+            onClick={() => { setActiveTab('pos'); setSyncMessage(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'pos' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            🛒 POS
+          </button>
+          
+          <button
+            onClick={() => { setActiveTab('inventory'); setSyncMessage(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'inventory' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            📦 Inventory
+          </button>
+          
+          <button
+            onClick={() => { setActiveTab('customers'); setSyncMessage(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'customers' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            👥 Customers
+          </button>
+        </nav>
+        
+        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
           {/* Connection status */}
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
             isOnline 
@@ -546,190 +600,102 @@ export default function App() {
           <button
             onClick={triggerManualSync}
             disabled={syncing || !isOnline}
-            className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs px-4 py-2 rounded-lg transition duration-150 cursor-pointer disabled:opacity-50"
+            className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg transition duration-150 cursor-pointer disabled:opacity-50"
           >
-            {syncing ? '🔄 Syncing...' : '🔄 Sync Now'}
+            {syncing ? '🔄' : '🔄'}
           </button>
 
-          <button onClick={handleLogout} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-4 py-2 rounded-lg transition duration-150 cursor-pointer">
+          <button onClick={handleLogout} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg transition duration-150 cursor-pointer">
             Logout
           </button>
         </div>
       </header>
 
-      {/* Main Layout Grid */}
-      <div className="flex flex-1">
-        {/* Navigation Sidebar */}
-        <aside className="w-64 bg-white border-r border-slate-200 p-4 flex flex-col justify-between shrink-0">
-          <div className="space-y-1">
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer transition-colors text-sm ${
-                activeTab === 'dashboard' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              onClick={() => { setActiveTab('dashboard'); setSyncMessage(null); }}
-            >
-              📊 Dashboard
-            </div>
-            
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer transition-colors text-sm ${
-                activeTab === 'pos' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              onClick={() => { setActiveTab('pos'); setSyncMessage(null); }}
-            >
-              🛒 Checkout POS
-            </div>
-            
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer transition-colors text-sm ${
-                activeTab === 'inventory' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              onClick={() => { setActiveTab('inventory'); setSyncMessage(null); }}
-            >
-              📦 Inventory
-            </div>
-            
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer transition-colors text-sm ${
-                activeTab === 'customers' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              onClick={() => { setActiveTab('customers'); setSyncMessage(null); }}
-            >
-              👥 Customers & Credit
-            </div>
-          </div>
+      {/* Mobile Navigation */}
+      {mobileMenuOpen && (
+        <nav className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex flex-col gap-2">
+          <button
+            onClick={() => { setActiveTab('dashboard'); setSyncMessage(null); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            📊 Dashboard
+          </button>
           
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
+          <button
+            onClick={() => { setActiveTab('pos'); setSyncMessage(null); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'pos' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            🛒 Checkout POS
+          </button>
+          
+          <button
+            onClick={() => { setActiveTab('inventory'); setSyncMessage(null); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'inventory' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            📦 Inventory
+          </button>
+          
+          <button
+            onClick={() => { setActiveTab('customers'); setSyncMessage(null); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'customers' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            👥 Customers & Credit
+          </button>
+          
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500 mt-2">
             User Account:<br />
             <strong className="text-slate-900">{user.fullName}</strong> ({user.role})
           </div>
-        </aside>
+        </nav>
+      )}
 
-        {/* Dynamic content view */}
-        <main className="flex-1 p-8 overflow-y-auto">
-          {syncMessage && (
-            <div className={`mb-6 p-4 rounded-xl border text-sm flex items-center gap-2 ${
-              syncMessage.type === 'success' 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                : syncMessage.type === 'danger'
-                ? 'bg-rose-50 border-rose-200 text-rose-800'
-                : 'bg-amber-50 border-amber-200 text-amber-800'
-            }`}>
-              <span>{syncMessage.type === 'success' ? '✅' : '⚠️'} {syncMessage.text}</span>
-            </div>
-          )}
+      {/* Dynamic content view */}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        {syncMessage && (
+          <div className={`mb-6 p-4 rounded-xl border text-sm flex items-center gap-2 ${
+            syncMessage.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : syncMessage.type === 'danger'
+              ? 'bg-rose-50 border-rose-200 text-rose-800'
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}>
+            <span>{syncMessage.type === 'success' ? '✅' : '⚠️'} {syncMessage.text}</span>
+          </div>
+        )}
 
-          {/* 1. DASHBOARD VIEW */}
-          {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
-              
-              {/* Metrics Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Today's Sales (Local Term)</div>
-                  <div className="text-3xl font-bold text-slate-900">ETB {dailySalesTotal.toLocaleString()}</div>
-                </div>
-                
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Credit Accounts Receivable</div>
-                  <div className="text-3xl font-bold text-slate-900">ETB {totalOutstandingReceivables.toLocaleString()}</div>
-                </div>
-                
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Low Stock Alert</div>
-                  <div className={`text-3xl font-bold ${lowStockItems.length > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {lowStockItems.length} Products
-                  </div>
-                </div>
-              </div>
+        {/* 1. DASHBOARD VIEW */}
+        {activeTab === 'dashboard' && (
+          <Dashboard
+            dailySalesTotal={dailySalesTotal}
+            totalOutstandingReceivables={totalOutstandingReceivables}
+            lowStockItems={lowStockItems}
+            orders={orders}
+            customers={customers}
+            products={products}
+            stockBalances={stockBalances}
+          />
+        )}
 
-              {/* Lists Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Recent Orders */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">Recent Sales Orders (Offline/Online)</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 bg-slate-50">
-                          <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Order ID</th>
-                          <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Total Amount</th>
-                          <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Method</th>
-                          <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orders.length === 0 ? (
-                          <tr><td colSpan={4} className="py-4 text-center text-slate-400">No sales transactions logged.</td></tr>
-                        ) : (
-                          orders.map((o) => (
-                            <tr key={o.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                              <td className="py-3 px-4 font-mono text-slate-600">{o.id.substring(0, 14)}...</td>
-                              <td className="py-3 px-4 font-semibold text-slate-900">ETB {o.totalAmount}</td>
-                              <td className="py-3 px-4 text-slate-700"><span className="text-xs bg-slate-100 px-2 py-0.5 rounded font-medium">{o.paymentMode}</span></td>
-                              <td className="py-3 px-4">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                                  o.syncStatus === 'SYNCED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                                }`}>
-                                  {o.syncStatus}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Low Stock Warning */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">Stock Replenishment Alerts</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 bg-slate-50">
-                          <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Product</th>
-                          <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Current Stock</th>
-                          <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Min Target</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lowStockItems.length === 0 ? (
-                          <tr><td colSpan={3} className="py-4 text-center text-emerald-600 font-semibold">✅ All items are healthy.</td></tr>
-                        ) : (
-                          lowStockItems.map((p) => {
-                            const bal = stockBalances[p.id] || 0;
-                            return (
-                              <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                                <td className="py-3 px-4 text-slate-900 font-medium">{p.name} <code className="text-slate-400 text-xs">({p.sku})</code></td>
-                                <td className="py-3 px-4 text-rose-600 font-bold">{bal} {p.unitOfMeasure}</td>
-                                <td className="py-3 px-4 text-slate-500">{p.minStockLevel} {p.unitOfMeasure}</td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 2. CHECKOUT POS VIEW */}
-          {activeTab === 'pos' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
-              {/* Product Catalog */}
-              <div className="lg:col-span-2 flex flex-col gap-4 overflow-y-auto pr-2">
-                <div className="sticky top-0 bg-slate-50 pb-2 z-5">
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
-                    placeholder="🔍 Search product catalog by name or SKU..."
-                    value={posSearch}
-                    onChange={(e) => setPosSearch(e.target.value)}
+        {/* 2. CHECKOUT POS VIEW */}
+        {activeTab === 'pos' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
+            {/* Product Catalog */}
+            <div className="lg:col-span-2 flex flex-col gap-4 overflow-y-auto pr-2">
+              <div className="sticky top-0 bg-slate-50 pb-2 z-5">
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
+                  placeholder="🔍 Search product catalog by name or SKU..."
+                  value={posSearch}
+                  onChange={(e) => setPosSearch(e.target.value)}
                   />
                 </div>
 
@@ -757,326 +723,326 @@ export default function App() {
                     );
                   })}
                 </div>
+            </div>
+
+            {/* Shopping Cart / Terminal Checkout */}
+            <div className="bg-white border border-slate-200 rounded-2xl flex flex-col h-full shadow-sm overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-200 px-4 py-3.5 font-bold text-slate-800 text-sm">
+                🛒 Cart Terminal
               </div>
 
-              {/* Shopping Cart / Terminal Checkout */}
-              <div className="bg-white border border-slate-200 rounded-2xl flex flex-col h-full shadow-sm overflow-hidden">
-                <div className="bg-slate-50 border-b border-slate-200 px-4 py-3.5 font-bold text-slate-800 text-sm">
-                  🛒 Cart Terminal
-                </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {checkoutError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg">
+                    <span>⚠️ {checkoutError}</span>
+                  </div>
+                )}
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {checkoutError && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg">
-                      <span>⚠️ {checkoutError}</span>
-                    </div>
-                  )}
-
-                  {cart.length === 0 ? (
-                    <div className="text-center text-slate-400 text-sm mt-12">
-                      Cart is empty.<br />Click catalog products to check out.
-                    </div>
-                  ) : (
-                    cart.map((item) => (
-                      <div key={item.product.id} className="flex justify-between items-center py-2 border-b border-slate-100">
-                        <div className="flex-1 pr-3">
-                          <div className="font-semibold text-slate-800 text-sm line-clamp-1">{item.product.name}</div>
-                          <div className="text-xs text-slate-400">
-                            ETB {item.product.sellingPrice} × {item.quantity}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button className="w-7 h-7 bg-slate-100 hover:bg-slate-250 text-slate-800 rounded font-bold cursor-pointer" onClick={() => updateCartQty(item.product.id, -1)}>-</button>
-                          <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
-                          <button className="w-7 h-7 bg-slate-100 hover:bg-slate-250 text-slate-800 rounded font-bold cursor-pointer" onClick={() => addToCart(item.product)}>+</button>
+                {cart.length === 0 ? (
+                  <div className="text-center text-slate-400 text-sm mt-12">
+                    Cart is empty.<br />Click catalog products to check out.
+                  </div>
+                ) : (
+                  cart.map((item) => (
+                    <div key={item.product.id} className="flex justify-between items-center py-2 border-b border-slate-100">
+                      <div className="flex-1 pr-3">
+                        <div className="font-semibold text-slate-800 text-sm line-clamp-1">{item.product.name}</div>
+                        <div className="text-xs text-slate-400">
+                          ETB {item.product.sellingPrice} × {item.quantity}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-3">
-                  {/* Customer Select */}
-                  <div>
-                    <div className="flex justify-between text-xs font-semibold text-slate-500 uppercase mb-1.5">
-                      <span>Client Account</span>
-                      <span
-                        className="text-blue-600 hover:underline cursor-pointer normal-case"
-                        onClick={() => setShowAddCustomer(true)}
-                      >
-                        + Create Customer
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button className="w-7 h-7 bg-slate-100 hover:bg-slate-250 text-slate-800 rounded font-bold cursor-pointer" onClick={() => updateCartQty(item.product.id, -1)}>-</button>
+                        <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
+                        <button className="w-7 h-7 bg-slate-100 hover:bg-slate-250 text-slate-800 rounded font-bold cursor-pointer" onClick={() => addToCart(item.product)}>+</button>
+                      </div>
                     </div>
-                    <select
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm"
-                      value={selectedCustomerId}
-                      onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  ))
+                )}
+              </div>
+
+              <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-3">
+                {/* Customer Select */}
+                <div>
+                  <div className="flex justify-between text-xs font-semibold text-slate-500 uppercase mb-1.5">
+                    <span>Client Account</span>
+                    <span
+                      className="text-blue-600 hover:underline cursor-pointer normal-case"
+                      onClick={() => setShowAddCustomer(true)}
                     >
-                      <option value="">-- Walk-in Cash Customer --</option>
-                      {customers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} (Outstanding: ETB {c.outstandingBalance})
-                        </option>
-                      ))}
-                    </select>
+                      + Create Customer
+                    </span>
                   </div>
-
-                  {/* Payment Mode */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Payment Method</label>
-                    <select
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm"
-                      value={paymentMode}
-                      onChange={(e) => setPaymentMode(e.target.value as any)}
-                    >
-                      <option value="CASH">Cash Payment</option>
-                      <option value="TELEBIRR">Telebirr Mobile Payment</option>
-                      <option value="CBE_BIRR">CBE Birr Mobile Payment</option>
-                      <option value="BANK_TRANSFER">Bank Transfer</option>
-                      <option value="CREDIT">Business Credit Ledger</option>
-                    </select>
-                  </div>
-
-                  {/* Pricing summaries */}
-                  <div className="space-y-1.5 text-sm border-t border-slate-200/60 pt-3">
-                    <div className="flex justify-between text-slate-500">
-                      <span>Subtotal</span>
-                      <span>ETB {cartSubtotal}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-slate-500">
-                      <span>Discount (ETB)</span>
-                      <input
-                        type="number"
-                        className="w-20 text-right px-2 py-0.5 border border-slate-200 bg-white rounded text-sm text-slate-800"
-                        value={discountAmount}
-                        onChange={(e) => setDiscountAmount(Number(e.target.value))}
-                      />
-                    </div>
-
-                    <div className="flex justify-between items-center text-slate-500">
-                      <span>Paid Amount (ETB)</span>
-                      <input
-                        type="number"
-                        disabled={paymentMode === 'CREDIT'}
-                        className="w-20 text-right px-2 py-0.5 border border-slate-200 bg-white rounded text-sm text-slate-800 disabled:bg-slate-100 disabled:text-slate-500"
-                        value={paidAmount}
-                        onChange={(e) => setPaidAmount(Number(e.target.value))}
-                      />
-                    </div>
-
-                    <div className="flex justify-between font-extrabold text-slate-900 text-base border-t border-dashed border-slate-200 pt-2">
-                      <span>Total Net</span>
-                      <span>ETB {cartTotal.toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleCheckout}
-                    disabled={cart.length === 0}
-                    className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer disabled:opacity-50"
+                  <select
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm"
+                    value={selectedCustomerId}
+                    onChange={(e) => setSelectedCustomerId(e.target.value)}
                   >
-                    Confirm Order & Receipt
-                  </button>
+                    <option value="">-- Walk-in Cash Customer --</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} (Outstanding: ETB {c.outstandingBalance})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* 3. INVENTORY ADJUSTMENT VIEW */}
-          {activeTab === 'inventory' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Product Inventory Table */}
-              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Stock Ledger Balances</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50">
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">SKU</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Product Name</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Cost Price</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Selling Price</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Stock Level</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((p) => {
-                        const bal = stockBalances[p.id] || 0;
-                        const isLow = bal < p.minStockLevel;
-                        return (
-                          <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                            <td className="py-3 px-4 font-mono text-slate-500">{p.sku}</td>
-                            <td className="py-3 px-4 font-medium text-slate-900">{p.name}</td>
-                            <td className="py-3 px-4 text-slate-700">ETB {p.costPrice}</td>
-                            <td className="py-3 px-4 text-slate-700">ETB {p.sellingPrice}</td>
-                            <td className={`py-3 px-4 font-bold ${isLow ? 'text-rose-600' : 'text-emerald-600'}`}>
-                              {bal} {p.unitOfMeasure}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                {/* Payment Mode */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Payment Method</label>
+                  <select
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm"
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value as any)}
+                  >
+                    <option value="CASH">Cash Payment</option>
+                    <option value="TELEBIRR">Telebirr Mobile Payment</option>
+                    <option value="CBE_BIRR">CBE Birr Mobile Payment</option>
+                    <option value="BANK_TRANSFER">Bank Transfer</option>
+                    <option value="CREDIT">Business Credit Ledger</option>
+                  </select>
                 </div>
-              </div>
 
-              {/* Log stock movements */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Register Inventory Movement</h3>
-                <form onSubmit={handleInventoryMovement} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Select Product</label>
-                    <select
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                      value={adjProductId}
-                      onChange={(e) => setAdjProductId(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Choose Product --</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                      ))}
-                    </select>
+                {/* Pricing summaries */}
+                <div className="space-y-1.5 text-sm border-t border-slate-200/60 pt-3">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Subtotal</span>
+                    <span>ETB {cartSubtotal}</span>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Movement Action</label>
-                    <select
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                      value={adjType}
-                      onChange={(e) => setAdjType(e.target.value as any)}
-                    >
-                      <option value="STOCK_IN">Stock In (Replenish / Purchase)</option>
-                      <option value="STOCK_OUT">Stock Out (Damage / Loss)</option>
-                      <option value="ADJUSTMENT">Count Discrepancy Adjustment</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Quantity (Units)</label>
+                  <div className="flex justify-between items-center text-slate-500">
+                    <span>Discount (ETB)</span>
                     <input
                       type="number"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                      min="1"
-                      value={adjQty}
-                      onChange={(e) => setAdjQty(Number(e.target.value))}
-                      required
+                      className="w-20 text-right px-2 py-0.5 border border-slate-200 bg-white rounded text-sm text-slate-800"
+                      value={discountAmount}
+                      onChange={(e) => setDiscountAmount(Number(e.target.value))}
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Notes / Reference</label>
-                    <textarea
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                      rows={3}
-                      placeholder="e.g. GRN Invoice #, Damaged during transit reason"
-                      value={adjNotes}
-                      onChange={(e) => setAdjNotes(e.target.value)}
+                  <div className="flex justify-between items-center text-slate-500">
+                    <span>Paid Amount (ETB)</span>
+                    <input
+                      type="number"
+                      disabled={paymentMode === 'CREDIT'}
+                      className="w-20 text-right px-2 py-0.5 border border-slate-200 bg-white rounded text-sm text-slate-800 disabled:bg-slate-100 disabled:text-slate-500"
+                      value={paidAmount}
+                      onChange={(e) => setPaidAmount(Number(e.target.value))}
                     />
                   </div>
 
-                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer">
-                    Log Movement
-                  </button>
-                </form>
+                  <div className="flex justify-between font-extrabold text-slate-900 text-base border-t border-dashed border-slate-200 pt-2">
+                    <span>Total Net</span>
+                    <span>ETB {cartTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleCheckout}
+                  disabled={cart.length === 0}
+                  className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer disabled:opacity-50"
+                >
+                  Confirm Order & Receipt
+                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* 4. CUSTOMERS & PAYMENTS VIEW */}
-          {activeTab === 'customers' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Customers Outstanding list */}
-              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
-                  <h3 className="text-lg font-bold text-slate-900">Credit Customer Balances</h3>
-                  <button onClick={() => setShowPayModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition duration-150 cursor-pointer">
-                    💰 Collect Outstanding Balance
-                  </button>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50">
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Customer Name</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Phone</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Credit Limit</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Outstanding Debt</th>
-                        <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Sync</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customers.map((c) => (
-                        <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                          <td className="py-3 px-4 font-bold text-slate-800">{c.name}</td>
-                          <td className="py-3 px-4 text-slate-500 font-mono text-xs">{c.phone || '-'}</td>
-                          <td className="py-3 px-4 text-slate-700">ETB {c.creditLimit.toLocaleString()}</td>
-                          <td className={`py-3 px-4 font-extrabold ${
-                            c.outstandingBalance > 0 ? 'text-rose-600' : 'text-slate-400'
-                          }`}>
-                            ETB {c.outstandingBalance.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                              c.syncStatus === 'SYNCED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                            }`}>
-                              {c.syncStatus}
-                            </span>
+        {/* 3. INVENTORY ADJUSTMENT VIEW */}
+        {activeTab === 'inventory' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Product Inventory Table */}
+            <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-4">Stock Ledger Balances</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">SKU</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Product Name</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Cost Price</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Selling Price</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Stock Level</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((p) => {
+                      const bal = stockBalances[p.id] || 0;
+                      const isLow = bal < p.minStockLevel;
+                      return (
+                        <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                          <td className="py-3 px-4 font-mono text-slate-500">{p.sku}</td>
+                          <td className="py-3 px-4 font-medium text-slate-900">{p.name}</td>
+                          <td className="py-3 px-4 text-slate-700">ETB {p.costPrice}</td>
+                          <td className="py-3 px-4 text-slate-700">ETB {p.sellingPrice}</td>
+                          <td className={`py-3 px-4 font-bold ${isLow ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {bal} {p.unitOfMeasure}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Add Customer Panel */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Add Credit Account</h3>
-                <form onSubmit={handleAddCustomer} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Customer Name</label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                      value={newCustName}
-                      onChange={(e) => setNewCustName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Phone Number</label>
-                    <input
-                      type="tel"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                      placeholder="+2519xxxxxxxx"
-                      value={newCustPhone}
-                      onChange={(e) => setNewCustPhone(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Credit Limit (ETB)</label>
-                    <input
-                      type="number"
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                      value={newCustCredit}
-                      onChange={(e) => setNewCustCredit(Number(e.target.value))}
-                    />
-                  </div>
-
-                  <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer">
-                    Save Account
-                  </button>
-                </form>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
-          )}
-        </main>
-      </div>
+
+            {/* Log stock movements */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
+              <h3 className="text-lg font-bold text-slate-900 mb-4">Register Inventory Movement</h3>
+              <form onSubmit={handleInventoryMovement} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Select Product</label>
+                  <select
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
+                    value={adjProductId}
+                    onChange={(e) => setAdjProductId(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Choose Product --</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Movement Action</label>
+                  <select
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
+                    value={adjType}
+                    onChange={(e) => setAdjType(e.target.value as any)}
+                  >
+                    <option value="STOCK_IN">Stock In (Replenish / Purchase)</option>
+                    <option value="STOCK_OUT">Stock Out (Damage / Loss)</option>
+                    <option value="ADJUSTMENT">Count Discrepancy Adjustment</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Quantity (Units)</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
+                    min="1"
+                    value={adjQty}
+                    onChange={(e) => setAdjQty(Number(e.target.value))}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Notes / Reference</label>
+                  <textarea
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
+                    rows={3}
+                    placeholder="e.g. GRN Invoice #, Damaged during transit reason"
+                    value={adjNotes}
+                    onChange={(e) => setAdjNotes(e.target.value)}
+                  />
+                </div>
+
+                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer">
+                  Log Movement
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 4. CUSTOMERS & PAYMENTS VIEW */}
+        {activeTab === 'customers' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Customers Outstanding list */}
+            <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                <h3 className="text-lg font-bold text-slate-900">Credit Customer Balances</h3>
+                <button onClick={() => setShowPayModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition duration-150 cursor-pointer">
+                  💰 Collect Outstanding Balance
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Customer Name</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Phone</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Credit Limit</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Outstanding Debt</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Sync</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.map((c) => (
+                      <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td className="py-3 px-4 font-bold text-slate-800">{c.name}</td>
+                        <td className="py-3 px-4 text-slate-500 font-mono text-xs">{c.phone || '-'}</td>
+                        <td className="py-3 px-4 text-slate-700">ETB {c.creditLimit.toLocaleString()}</td>
+                        <td className={`py-3 px-4 font-extrabold ${
+                          c.outstandingBalance > 0 ? 'text-rose-600' : 'text-slate-400'
+                        }`}>
+                          ETB {c.outstandingBalance.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                            c.syncStatus === 'SYNCED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          }`}>
+                            {c.syncStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Add Customer Panel */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
+              <h3 className="text-lg font-bold text-slate-900 mb-4">Add Credit Account</h3>
+              <form onSubmit={handleAddCustomer} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Customer Name</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
+                    value={newCustName}
+                    onChange={(e) => setNewCustName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Phone Number</label>
+                  <input
+                    type="tel"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
+                    placeholder="+2519xxxxxxxx"
+                    value={newCustPhone}
+                    onChange={(e) => setNewCustPhone(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Credit Limit (ETB)</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
+                    value={newCustCredit}
+                    onChange={(e) => setNewCustCredit(Number(e.target.value))}
+                  />
+                </div>
+
+                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer">
+                  Save Account
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
 
       {/* MODAL 1: ADD CUSTOMER POPUP (POS SHORTCUT) */}
       {showAddCustomer && (
