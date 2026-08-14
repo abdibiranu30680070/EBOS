@@ -3,7 +3,9 @@
 // Central config: API URL, payment modes, nav tabs
 // ─────────────────────────────────────────────
 
-export const API_BASE_URL = 'http://localhost:3000';
+export const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000' 
+  : `http://${window.location.hostname}:3000`;
 
 export const PAYMENT_MODES = [
   { value: 'CASH',          label: 'Cash' },
@@ -37,7 +39,7 @@ export const NAV_TABS = {
   ],
   purchases: [
     { id: 'po',        icon: '📝', label: 'Purchase Orders' },
-    { id: 'suppliers', icon: '🏭', label: 'Suppliers' },
+    { id: 'suppliers', icon: '🏭', label: 'Vendors' },
   ],
   inventory: [
     { id: 'stock',     icon: '📦', label: 'Stock Ledger' },

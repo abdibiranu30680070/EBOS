@@ -12,16 +12,22 @@ import { syncNow }   from '../../lib/syncEngine.js';
 import { DEFAULT_BUSINESS_ID } from '../../lib/constants.js';
 
 export function AddSupplierModal({ isOpen, onClose, user, onSuccess }) {
-  const [name,   setName]   = useState('');
-  const [error,  setError]  = useState('');
-  const [saving, setSaving] = useState(false);
+  const [name,    setName]    = useState('');
+  const [phone,   setPhone]   = useState('');
+  const [tin,     setTin]     = useState('');
+  const [address, setAddress] = useState('');
+  const [error,   setError]   = useState('');
+  const [saving,  setSaving]  = useState(false);
 
-  const reset = () => { setName(''); setError(''); };
+  const reset = () => { 
+    setName(''); setPhone(''); setTin(''); setAddress(''); setError(''); 
+  };
+  
   const handleClose = () => { reset(); onClose(); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) { setError('Supplier name is required.'); return; }
+    if (!name.trim()) { setError('Vendor name is required.'); return; }
 
     setSaving(true);
     try {
@@ -30,6 +36,9 @@ export function AddSupplierModal({ isOpen, onClose, user, onSuccess }) {
         id:         suppId,
         businessId: user?.businessId || DEFAULT_BUSINESS_ID,
         name:       name.trim(),
+        phone:      phone.trim(),
+        tin:        tin.trim(),
+        address:    address.trim(),
         syncStatus: 'PENDING',
       });
 
@@ -37,28 +46,62 @@ export function AddSupplierModal({ isOpen, onClose, user, onSuccess }) {
       reset();
       onSuccess?.(suppId);
     } catch (err) {
-      setError(`Could not save supplier: ${err.message}`);
+      setError(`Could not save vendor: ${err.message}`);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add New Supplier">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Add New Vendor">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">{error}</div>
         )}
 
-        <FormField label="Supplier Name / Company" required>
+        <FormField label="Vendor Name / Company" required>
           <input
-            id="supp-name"
+            id="vend-name"
             type="text"
             className={inputClass}
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="e.g. Addis Wholesalers Ltd"
             required
+          />
+        </FormField>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Phone Number">
+            <input
+              id="vend-phone"
+              type="tel"
+              className={inputClass}
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+251..."
+            />
+          </FormField>
+          
+          <FormField label="TIN (Tax ID)">
+            <input
+              id="vend-tin"
+              type="text"
+              className={inputClass}
+              value={tin}
+              onChange={e => setTin(e.target.value)}
+              placeholder="e.g. 000123456"
+            />
+          </FormField>
+        </div>
+
+        <FormField label="Physical Address">
+          <textarea
+            id="vend-address"
+            className={`${inputClass} resize-none h-20`}
+            value={address}
+            onChange={e => setAddress(e.target.value)}
+            placeholder="e.g. Mercato, Addis Ababa"
           />
         </FormField>
 
@@ -75,7 +118,7 @@ export function AddSupplierModal({ isOpen, onClose, user, onSuccess }) {
             disabled={saving}
             className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-sm py-2.5 rounded-xl transition-colors"
           >
-            {saving ? 'Saving…' : 'Save Supplier'}
+            {saving ? 'Saving…' : 'Save Vendor'}
           </button>
         </div>
       </form>

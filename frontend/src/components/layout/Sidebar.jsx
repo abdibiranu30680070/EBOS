@@ -5,11 +5,15 @@
 
 import { NAV_TABS } from '../../lib/constants.js';
 
-export function Sidebar({ activeModule, activeTab, onTabChange, user }) {
+export function Sidebar({ activeModule, activeTab, onTabChange, user, isOpen }) {
   const tabs = NAV_TABS[activeModule] || [];
 
   return (
-    <aside className="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col justify-between p-4">
+    <aside className={`
+      w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col justify-between p-4
+      fixed inset-y-0 left-0 z-30 transition-transform duration-300 md:static md:translate-x-0
+      ${isOpen ? 'translate-x-0 mt-[65px] md:mt-0' : '-translate-x-full'}
+    `}>
       {/* Nav links */}
       <nav className="space-y-1">
         {tabs.map(({ id, icon, label }) => (

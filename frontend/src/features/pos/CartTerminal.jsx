@@ -22,7 +22,7 @@ export function CartTerminal({
   onShowAddCustomer,
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm overflow-hidden">
+    <div className="bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm overflow-hidden h-full">
       {/* Panel header */}
       <div className="bg-slate-50 border-b border-slate-200 px-5 py-3.5 flex items-center justify-between shrink-0">
         <span className="font-bold text-slate-800 text-sm">🛒 Cart Terminal</span>

@@ -5,6 +5,7 @@
 //        onTabChange, onSync, onLogout, children
 // ─────────────────────────────────────────────
 
+import { useState } from 'react';
 import { Header }  from './Header.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import { Alert }   from '../ui/Alert.jsx';
@@ -13,6 +14,8 @@ export function AppShell({
   user, isOnline, syncing, syncMessage, activeModule, activeTab,
   onModuleChange, onTabChange, onSync, onLogout, onDismissSync, children,
 }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       <Header
@@ -20,20 +23,30 @@ export function AppShell({
         isOnline={isOnline}
         syncing={syncing}
         activeModule={activeModule}
-        onModuleChange={onModuleChange}
+        onModuleChange={(mod) => { onModuleChange(mod); setSidebarOpen(false); }}
         onSync={onSync}
         onLogout={onLogout}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <Sidebar
           activeModule={activeModule}
           activeTab={activeTab}
-          onTabChange={onTabChange}
+          onTabChange={(tab) => { onTabChange(tab); setSidebarOpen(false); }}
           user={user}
+          isOpen={sidebarOpen}
         />
+        
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-slate-900/50 z-20 md:hidden" 
+            onClick={() => setSidebarOpen(false)} 
+          />
+        )}
 
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
           {/* Global sync alert banner */}
           {syncMessage && (
             <div className="mb-6">

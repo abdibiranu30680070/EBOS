@@ -5,13 +5,13 @@
 
 import { SyncBadge } from '../../components/ui/Badge.jsx';
 
-const HEADERS = ['Supplier Name', 'Sync', 'Actions'];
+const HEADERS = ['Vendor Name', 'Contact Info', 'Sync', 'Actions'];
 
 export function SuppliersTable({ suppliers }) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden h-full flex flex-col">
       <div className="px-6 py-4 border-b border-slate-100 shrink-0">
-        <h3 className="font-bold text-slate-800">Suppliers</h3>
+        <h3 className="font-bold text-slate-800">Vendors</h3>
         <p className="text-xs text-slate-400 mt-0.5">{suppliers.length} registered</p>
       </div>
 
@@ -30,13 +30,18 @@ export function SuppliersTable({ suppliers }) {
             {suppliers.length === 0 ? (
               <tr>
                 <td colSpan={HEADERS.length} className="py-10 text-center text-slate-400 text-sm">
-                  No suppliers found. Add one to create a Purchase Order.
+                  No vendors found. Add one to create a Purchase Order.
                 </td>
               </tr>
             ) : (
               suppliers.map(s => (
                 <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                   <td className="py-3.5 px-5 font-bold text-slate-800">{s.name}</td>
+                  <td className="py-3.5 px-5 text-slate-500">
+                    {s.phone && <div className="text-xs">{s.phone}</div>}
+                    {s.tin && <div className="text-[10px] text-slate-400">TIN: {s.tin}</div>}
+                    {!s.phone && !s.tin && <span className="text-slate-300">—</span>}
+                  </td>
                   <td className="py-3.5 px-5">
                     <SyncBadge status={s.syncStatus} />
                   </td>

@@ -25,13 +25,13 @@ export function PurchasesPage({ user }) {
         <div className="flex items-end justify-between shrink-0">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Purchases & Receiving</h1>
-            <p className="text-slate-400 text-sm mt-0.5">Manage suppliers and stock intake ({purchaseOrders.length} POs total)</p>
+            <p className="text-slate-400 text-sm mt-0.5">Manage vendors and stock intake ({purchaseOrders.length} POs total)</p>
           </div>
           <button
             onClick={() => setShowAdd(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors"
           >
-            + Add Supplier
+            + Add Vendor
           </button>
         </div>
 
@@ -53,7 +53,7 @@ export function PurchasesPage({ user }) {
         user={user}
         onSuccess={(id) => {
           setShowAdd(false);
-          toast.success('Supplier added successfully');
+          toast.success('Vendor added successfully');
         }}
       />
     </>
