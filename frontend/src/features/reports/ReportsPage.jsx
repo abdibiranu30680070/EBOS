@@ -9,6 +9,7 @@ import { SalesSummaryCards } from './SalesSummaryCards.jsx';
 import { PaymentBreakdown }  from './PaymentBreakdown.jsx';
 import { TopProductsTable }  from './TopProductsTable.jsx';
 import { DailySalesChart }   from './DailySalesChart.jsx';
+import { ItemizedSalesTable } from './ItemizedSalesTable.jsx';
 import { selectClass }       from '../../components/ui/FormField.jsx';
 
 export function ReportsPage({ orders, products }) {
@@ -53,6 +54,9 @@ export function ReportsPage({ orders, products }) {
           <PaymentBreakdown orders={orders} range={range} />
         </div>
       </div>
+
+      {/* Direct Product Quantity Report */}
+      <ItemizedSalesTable orders={orders} products={products} range={range} />
     </div>
   );
 }
