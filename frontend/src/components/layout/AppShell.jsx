@@ -35,6 +35,7 @@ export function AppShell({
           activeTab={activeTab}
           onTabChange={(tab) => { onTabChange(tab); setSidebarOpen(false); }}
           user={user}
+          isOnline={isOnline}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />

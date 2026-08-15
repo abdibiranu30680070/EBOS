@@ -54,8 +54,8 @@ export function Header({ user, isOnline, syncing, activeModule, onModuleChange, 
           🏢 {user?.branchName ?? 'Main Branch'}
         </span>
 
-        {/* Network indicator */}
-        <span className={`text-[11px] sm:text-xs font-semibold px-2.5 py-1 sm:py-1.5 rounded-full border transition-colors ${
+        {/* Network indicator (Hidden on mobile phones to keep navbar super clean) */}
+        <span className={`hidden sm:inline-block text-[11px] sm:text-xs font-semibold px-2.5 py-1 sm:py-1.5 rounded-full border transition-colors ${
           isOnline
             ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/80'
             : 'bg-rose-950/80 text-rose-400 border-rose-800/80'

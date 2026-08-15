@@ -4,7 +4,7 @@
 
 import { NAV_TABS } from '../../lib/constants.js';
 
-export function Sidebar({ activeModule, activeTab, onTabChange, user, isOpen, onClose }) {
+export function Sidebar({ activeModule, activeTab, onTabChange, user, isOnline, isOpen, onClose }) {
   const tabs = NAV_TABS[activeModule] || [];
 
   return (
@@ -45,10 +45,17 @@ export function Sidebar({ activeModule, activeTab, onTabChange, user, isOpen, on
         ))}
       </nav>
 
-      {/* User info & mobile logout footer */}
+      {/* User info & status footer */}
       <div className="pt-3 border-t border-slate-100 space-y-2">
-        <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 space-y-0.5">
-          <div className="text-slate-400 uppercase tracking-wider font-semibold text-[10px]">Signed in as</div>
+        <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 uppercase tracking-wider font-semibold text-[10px]">Signed in as</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              isOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+            }`}>
+              {isOnline ? '🟢 Online' : '🔌 Offline'}
+            </span>
+          </div>
           <div className="font-bold text-slate-800 truncate">{user?.fullName ?? user?.username ?? '—'}</div>
           <div className="text-slate-400 capitalize">{user?.role?.toLowerCase() ?? 'User'} • {user?.branchName ?? 'Main Branch'}</div>
         </div>
