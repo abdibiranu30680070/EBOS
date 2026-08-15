@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">EBOS</string>
+    <string name="title_activity_main">EBOS</string>
+    <string name="package_name">com.ebos.app</string>
+    <string name="custom_url_scheme">com.ebos.app</string>
+</resources>
