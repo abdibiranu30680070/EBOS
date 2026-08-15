@@ -78,7 +78,12 @@ export function LoginPage({ isOnline, onLogin, authError, syncMessage, defaultMo
         throw new Error(data.message || 'Business registration failed.');
       }
 
-      setRegSuccess(`🎉 Business "${data.businessName}" created successfully! Your Business ID is ${data.businessId}. Logging in…`);
+      setRegSuccess(`🎉 Business "${data.businessName}" created successfully! Your unique Business ID is: ${data.businessId}`);
+
+      // Pre-fill login state for future logins
+      setBusinessId(data.businessId);
+      setUsername(data.username);
+      setPassword(regForm.password);
 
       // Automatically log the new merchant in!
       setTimeout(async () => {
@@ -87,7 +92,7 @@ export function LoginPage({ isOnline, onLogin, authError, syncMessage, defaultMo
           username:   data.username,
           password:   regForm.password,
         });
-      }, 1500);
+      }, 1800);
 
     } catch (err) {
       setRegError(err.message || 'Registration failed. Please check your network connection.');
@@ -139,13 +144,18 @@ export function LoginPage({ isOnline, onLogin, authError, syncMessage, defaultMo
             {/* ── Mode 1: Login Form ─────────────────────── */}
             {mode === 'login' && (
               <>
+                <div className="pb-1">
+                  <h3 className="text-sm font-bold text-white">Existing Store Login</h3>
+                  <p className="text-xs text-slate-400">Enter your assigned Business ID, Username, and Password.</p>
+                </div>
+
                 {/* Alerts */}
                 {authError && <Alert type="danger">{authError}</Alert>}
                 {syncMessage && <Alert type={syncMessage.type}>{syncMessage.text}</Alert>}
 
                 {/* Demo credentials hint */}
                 <div className="p-3.5 bg-slate-700/50 border border-slate-600 rounded-xl text-xs text-slate-300 space-y-1">
-                  <p className="text-white font-semibold mb-1">🔑 Quick Demo Credentials</p>
+                  <p className="text-white font-semibold mb-1">🔑 Demo Store Credentials</p>
                   <p>Business ID: <code className="text-blue-400 font-mono">bus_mercato_001</code></p>
                   <p>User: <code className="text-blue-400 font-mono">almaz</code> &nbsp;|&nbsp; Pass: <code className="text-blue-400 font-mono">almaz123</code></p>
                 </div>
@@ -153,7 +163,7 @@ export function LoginPage({ isOnline, onLogin, authError, syncMessage, defaultMo
                 <form onSubmit={handleLoginSubmit} className="space-y-3.5">
                   <div>
                     <label htmlFor="businessId" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                      Business ID
+                      Business ID (e.g. bus_mercato_001 or your registered ID)
                     </label>
                     <input
                       id="businessId"
@@ -161,7 +171,8 @@ export function LoginPage({ isOnline, onLogin, authError, syncMessage, defaultMo
                       value={businessId}
                       onChange={(e) => setBusinessId(e.target.value)}
                       required
-                      className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="bus_..."
+                      className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                     />
                   </div>
 
@@ -207,6 +218,11 @@ export function LoginPage({ isOnline, onLogin, authError, syncMessage, defaultMo
             {/* ── Mode 2: Business Registration Form ─────── */}
             {mode === 'register' && (
               <>
+                <div className="pb-1">
+                  <h3 className="text-sm font-bold text-white">Register New Business Store</h3>
+                  <p className="text-xs text-slate-400">Creates a brand new store tenant and generates a unique Business ID for login.</p>
+                </div>
+
                 {regError && <Alert type="danger">{regError}</Alert>}
                 {regSuccess && <Alert type="success">{regSuccess}</Alert>}
 
