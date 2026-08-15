@@ -1,8 +1,4 @@
-// ─────────────────────────────────────────────
-// CartTerminal — Right-hand cart panel
-// Composes CartItem list + CheckoutForm + Quick Product Search
-// ─────────────────────────────────────────────
-
+import { useState }                from 'react';
 import { CartItem }                from './CartItem.jsx';
 import { CheckoutForm }            from './CheckoutForm.jsx';
 import { SearchableProductSelect } from '../../components/common/SearchableProductSelect.jsx';
@@ -23,6 +19,8 @@ export function CartTerminal({
   onCheckout,
   onShowAddCustomer,
 }) {
+  const [quickQty, setQuickQty] = useState(1);
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm overflow-hidden h-full">
       {/* Panel header */}
@@ -35,17 +33,41 @@ export function CartTerminal({
         )}
       </div>
 
-      {/* Quick Add Product Auto-complete Search */}
-      <div className="px-4 py-2.5 bg-slate-50/50 border-b border-slate-100 shrink-0">
-        <SearchableProductSelect
-          products={products}
-          selectedProductId=""
-          onSelect={(prodId) => {
-            const p = products.find(prod => prod.id === prodId);
-            if (p) onAddToCart(p);
-          }}
-          placeholder="🔍 Type product name or SKU to quick add..."
-        />
+      {/* Direct Quantity & Product Selection Form */}
+      <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-200 shrink-0 space-y-1">
+        <div className="flex items-center gap-2">
+          {/* Quantity Input Field */}
+          <div className="w-20 shrink-0">
+            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Qty</label>
+            <input
+              type="number"
+              min="1"
+              step="any"
+              value={quickQty}
+              onChange={(e) => setQuickQty(e.target.value)}
+              onClick={(e) => e.target.select()}
+              className="w-full px-2 py-2 bg-white border border-slate-300 rounded-xl text-sm font-extrabold text-slate-800 text-center focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-xs"
+            />
+          </div>
+
+          {/* Product Select Input Field */}
+          <div className="flex-1 min-w-0">
+            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Product</label>
+            <SearchableProductSelect
+              products={products}
+              selectedProductId=""
+              onSelect={(prodId) => {
+                const p = products.find(prod => prod.id === prodId);
+                if (p) {
+                  const qtyToAdd = Math.max(1, Number(quickQty) || 1);
+                  onAddToCart(p, qtyToAdd);
+                  setQuickQty(1); // Reset after adding
+                }
+              }}
+              placeholder="🔍 Search & select product..."
+            />
+          </div>
+        </div>
       </div>
 
       {/* Cart item list */}

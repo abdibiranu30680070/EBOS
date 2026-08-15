@@ -9,6 +9,7 @@ import { ProductCard }  from './ProductCard.jsx';
 export function ProductCatalog({ products, stockBalances, onAddToCart }) {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [catalogQty, setCatalogQty] = useState(1);
 
   // Extract unique categories or tags if available
   const categories = ['ALL', ...new Set(products.map(p => p.unitOfMeasure ? p.unitOfMeasure.toUpperCase() : 'GENERAL'))];
@@ -21,18 +22,42 @@ export function ProductCatalog({ products, stockBalances, onAddToCart }) {
     return matchesSearch && matchesCategory;
   });
 
+  const handleCardAdd = (product) => {
+    const qty = Math.max(1, Number(catalogQty) || 1);
+    onAddToCart(product, qty);
+  };
+
   return (
     <div className="flex flex-col gap-4 overflow-y-auto">
-      {/* Search & Category Filter bar */}
+      {/* Search & Quantity Entry bar */}
       <div className="sticky top-0 bg-slate-50 pb-2 z-[1] space-y-2">
-        <input
-          id="pos-product-search"
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="🔍  Search by product name or SKU..."
-          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
-        />
+        <div className="flex items-center gap-2">
+          {/* Quantity Selector for Grid Taps */}
+          <div className="w-20 shrink-0">
+            <input
+              type="number"
+              min="1"
+              step="any"
+              value={catalogQty}
+              onChange={e => setCatalogQty(e.target.value)}
+              onClick={e => e.target.select()}
+              title="Quantity to add per tap"
+              className="w-full px-2 py-3 bg-white border border-slate-200 rounded-xl text-sm font-extrabold text-slate-800 text-center shadow-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Search Box */}
+          <div className="flex-1 min-w-0">
+            <input
+              id="pos-product-search"
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="🔍  Search by product name or SKU..."
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
+            />
+          </div>
+        </div>
 
         {/* Quick Category Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
@@ -64,7 +89,7 @@ export function ProductCatalog({ products, stockBalances, onAddToCart }) {
               key={p.id}
               product={p}
               stockBalance={stockBalances[p.id] || 0}
-              onAdd={onAddToCart}
+              onAdd={handleCardAdd}
             />
           ))}
         </div>

@@ -28,15 +28,16 @@ export function useCart({ user, customers }) {
 
   // ── Cart mutations ────────────────────────────
 
-  const addToCart = (product) => {
+  const addToCart = (product, quantityToAdd = 1) => {
+    const qtyNum = Math.max(1, Number(quantityToAdd) || 1);
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
         return prev.map(item =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.product.id === product.id ? { ...item, quantity: item.quantity + qtyNum } : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: qtyNum }];
     });
   };
 
