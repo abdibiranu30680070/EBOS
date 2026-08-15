@@ -54,6 +54,23 @@ export class SyncController {
       },
     });
 
+    const suppliers = await this.prisma.supplier.findMany({
+      where: {
+        businessId,
+        updatedAt: { gt: lastSyncedAt },
+      },
+    });
+
+    const purchaseOrders = await this.prisma.purchaseOrder.findMany({
+      where: {
+        branchId,
+        updatedAt: { gt: lastSyncedAt },
+      },
+      include: {
+        items: true,
+      },
+    });
+
     return {
       serverTime: new Date().toISOString(),
       changes: {
@@ -62,6 +79,8 @@ export class SyncController {
         inventoryMovements,
         salesOrders,
         payments,
+        suppliers,
+        purchaseOrders,
       },
     };
   }
@@ -69,15 +88,75 @@ export class SyncController {
   @Post('push')
   async push(@Request() req: any, @Body() body: any) {
     const { businessId, branchId, sub: userId } = req.user;
-    const { customers = [], salesOrders = [], inventoryMovements = [], payments = [] } = body;
+    const { 
+      customers = [], 
+      salesOrders = [], 
+      inventoryMovements = [], 
+      payments = [],
+      suppliers = [],
+      purchaseOrders = []
+    } = body;
 
     const results = await this.prisma.$transaction(async (tx: any) => {
       const syncedCustomerIds: string[] = [];
       const syncedOrderIds: string[] = [];
       const syncedMovementIds: string[] = [];
       const syncedPaymentIds: string[] = [];
+      const syncedSupplierIds: string[] = [];
+      const syncedPurchaseOrderIds: string[] = [];
 
-      // 1. Process Customers (created/updated offline)
+      // Process Suppliers
+      for (const supplier of suppliers) {
+        await tx.supplier.upsert({
+          where: { id: supplier.id },
+          update: {
+            name: supplier.name,
+            phone: supplier.phone || null,
+            email: supplier.email || null,
+            address: supplier.address || null,
+          },
+          create: {
+            id: supplier.id,
+            businessId,
+            name: supplier.name,
+            phone: supplier.phone || null,
+            email: supplier.email || null,
+            address: supplier.address || null,
+          },
+        });
+        syncedSupplierIds.push(supplier.id);
+      }
+
+      // Process Purchase Orders
+      for (const po of purchaseOrders) {
+        const existingPo = await tx.purchaseOrder.findUnique({
+          where: { id: po.id },
+        });
+
+        if (!existingPo) {
+          await tx.purchaseOrder.create({
+            data: {
+              id: po.id,
+              branchId,
+              supplierId: po.supplierId,
+              createdAt: new Date(po.createdAt),
+            },
+          });
+
+          for (const item of po.items || []) {
+            await tx.purchaseOrderItem.create({
+              data: {
+                id: item.id,
+                orderId: po.id,
+                productId: item.productId,
+              },
+            });
+          }
+        }
+        syncedPurchaseOrderIds.push(po.id);
+      }
+
+      // Process Customers
       for (const customer of customers) {
         await tx.customer.upsert({
           where: { id: customer.id },
@@ -99,7 +178,7 @@ export class SyncController {
         syncedCustomerIds.push(customer.id);
       }
 
-      // 2. Process Sales Orders
+      // Process Sales Orders
       for (const order of salesOrders) {
         // Check if the order already exists to avoid duplicate logic
         const existingOrder = await tx.salesOrder.findUnique({
@@ -154,7 +233,7 @@ export class SyncController {
         syncedOrderIds.push(order.id);
       }
 
-      // 3. Process Payments
+      // Process Payments
       for (const payment of payments) {
         const existingPayment = await tx.customerPayment.findUnique({
           where: { id: payment.id },
@@ -187,7 +266,7 @@ export class SyncController {
         syncedPaymentIds.push(payment.id);
       }
 
-      // 4. Process Inventory Movements
+      // Process Inventory Movements
       for (const movement of inventoryMovements) {
         const existingMovement = await tx.inventoryMovement.findUnique({
           where: { id: movement.id },
@@ -211,7 +290,7 @@ export class SyncController {
         syncedMovementIds.push(movement.id);
       }
 
-      // 5. Add Audit Log
+      // Add Audit Log
       await tx.auditLog.create({
         data: {
           id: `aud_${Date.now()}`,
@@ -221,6 +300,8 @@ export class SyncController {
             ordersCount: salesOrders.length,
             movementsCount: inventoryMovements.length,
             paymentsCount: payments.length,
+            suppliersCount: suppliers.length,
+            poCount: purchaseOrders.length,
           }),
         },
       });
@@ -230,6 +311,8 @@ export class SyncController {
         salesOrders: syncedOrderIds,
         inventoryMovements: syncedMovementIds,
         payments: syncedPaymentIds,
+        suppliers: syncedSupplierIds,
+        purchaseOrders: syncedPurchaseOrderIds,
       };
     });
 

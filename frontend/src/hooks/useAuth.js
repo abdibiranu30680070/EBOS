@@ -7,6 +7,13 @@ import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../lib/constants.js';
 import { syncNow } from '../lib/syncEngine.js';
 
+async function hashPassword(password) {
+  const msgBuffer = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function useAuth({ isOnline, setSyncMessage }) {
   const [user, setUser]           = useState(null);
   const [authError, setAuthError] = useState('');
@@ -25,12 +32,14 @@ export function useAuth({ isOnline, setSyncMessage }) {
 
   /**
    * Handles login form submission.
-   * Online: calls backend API, caches token + user.
+   * Online: calls backend API, caches token + user + hashed password.
    * Offline: checks previously cached credentials.
    */
   const handleLogin = async ({ businessId, username, password }) => {
     setAuthError('');
     setSyncMessage(null);
+
+    const hashedInput = await hashPassword(password);
 
     if (isOnline) {
       try {
@@ -47,7 +56,10 @@ export function useAuth({ isOnline, setSyncMessage }) {
 
         const data = await res.json();
         localStorage.setItem('ebos_token', data.access_token);
-        localStorage.setItem('ebos_user', JSON.stringify(data.user));
+        
+        // Cache user info and securely cache hashed password for offline fallback
+        const cacheData = { ...data.user, offlineHash: hashedInput };
+        localStorage.setItem('ebos_user', JSON.stringify(cacheData));
         setUser(data.user);
 
         // Immediately sync after login to populate local DB
@@ -63,9 +75,19 @@ export function useAuth({ isOnline, setSyncMessage }) {
       const cached = localStorage.getItem('ebos_user');
       if (cached) {
         const cachedUser = JSON.parse(cached);
-        if (cachedUser.username === username && cachedUser.businessId === businessId) {
-          setUser(cachedUser);
+        // Validates username, businessId AND the hashed password
+        if (
+          cachedUser.username === username && 
+          cachedUser.businessId === businessId && 
+          cachedUser.offlineHash === hashedInput
+        ) {
+          // Do not leak offlineHash into memory state
+          const { offlineHash, ...safeUser } = cachedUser;
+          setUser(safeUser);
           setSyncMessage({ type: 'warning', text: 'Offline login. Sync will resume when connected.' });
+          return;
+        } else {
+          setAuthError('Invalid offline credentials.');
           return;
         }
       }

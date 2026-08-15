@@ -37,10 +37,13 @@ export async function syncNow() {
 
 // ─── PUSH: Upload pending local records ───────
 async function _pushPendingChanges() {
+  const pendingProducts   = await db.products.where('syncStatus').equals('PENDING').toArray().catch(() => []);
   const pendingCustomers  = await db.customers.where('syncStatus').equals('PENDING').toArray();
   const pendingOrders     = await db.salesOrders.where('syncStatus').equals('PENDING').toArray();
   const pendingPayments   = await db.customerPayments.where('syncStatus').equals('PENDING').toArray();
   const pendingMovements  = await db.inventoryMovements.where('syncStatus').equals('PENDING').toArray();
+  const pendingSuppliers  = await db.suppliers.where('syncStatus').equals('PENDING').toArray().catch(() => []);
+  const pendingPOs        = await db.purchaseOrders.where('syncStatus').equals('PENDING').toArray().catch(() => []);
 
   // Enrich orders with their line items
   const ordersWithItems = await Promise.all(
@@ -51,6 +54,17 @@ async function _pushPendingChanges() {
         items: items.map(({ id, productId, quantity, unitPrice, totalPrice }) => ({
           id, productId, quantity, unitPrice, totalPrice,
         })),
+      };
+    })
+  );
+
+  // Enrich POs with their line items
+  const posWithItems = await Promise.all(
+    pendingPOs.map(async (po) => {
+      const items = await db.purchaseOrderItems.where('orderId').equals(po.id).toArray().catch(() => []);
+      return {
+        ...po,
+        items: items.map(({ id, productId }) => ({ id, productId })),
       };
     })
   );
@@ -82,10 +96,13 @@ async function _pushPendingChanges() {
   }
 
   const hasChanges =
+    pendingProducts.length > 0 ||
     pendingCustomers.length > 0 ||
     ordersWithItems.length > 0 ||
     pendingPayments.length > 0 ||
-    pendingMovements.length > 0;
+    pendingMovements.length > 0 ||
+    pendingSuppliers.length > 0 ||
+    posWithItems.length > 0;
 
   if (!hasChanges) {
     console.log('[SyncEngine] No pending entity changes to push.');
@@ -97,10 +114,13 @@ async function _pushPendingChanges() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({
+      products:           pendingProducts,
       customers:          pendingCustomers,
       salesOrders:        ordersWithItems,
       customerPayments:   pendingPayments,
       inventoryMovements: pendingMovements,
+      suppliers:          pendingSuppliers,
+      purchaseOrders:     posWithItems,
     }),
   });
 
@@ -109,14 +129,20 @@ async function _pushPendingChanges() {
   const result = await response.json();
   if (!result.success || !result.synced) return;
 
-  const { customers: sc, salesOrders: so, inventoryMovements: sm, payments: sp } = result.synced;
+  const { customers: sc, salesOrders: so, inventoryMovements: sm, payments: sp, suppliers: ss, purchaseOrders: spo } = result.synced;
 
   // Mark pushed records as SYNCED in a single transaction
-  await db.transaction('rw', [db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements], async () => {
+  await db.transaction('rw', [
+    db.products, db.customers, db.salesOrders, db.customerPayments, 
+    db.inventoryMovements, db.suppliers, db.purchaseOrders
+  ], async () => {
+    if (result.synced.products?.length) await Promise.all(result.synced.products.map(id => db.products.update(id, { syncStatus: 'SYNCED' })));
     if (sc?.length) await Promise.all(sc.map(id => db.customers.update(id, { syncStatus: 'SYNCED' })));
     if (so?.length) await Promise.all(so.map(id => db.salesOrders.update(id, { syncStatus: 'SYNCED' })));
     if (sp?.length) await Promise.all(sp.map(id => db.customerPayments.update(id, { syncStatus: 'SYNCED' })));
     if (sm?.length) await Promise.all(sm.map(id => db.inventoryMovements.update(id, { syncStatus: 'SYNCED' })));
+    if (ss?.length) await Promise.all(ss.map(id => db.suppliers.update(id, { syncStatus: 'SYNCED' })));
+    if (spo?.length) await Promise.all(spo.map(id => db.purchaseOrders.update(id, { syncStatus: 'SYNCED' })));
   });
 
   console.log('[SyncEngine] Push complete.');
@@ -140,11 +166,15 @@ async function _pullRemoteChanges() {
 
   await db.transaction(
     'rw',
-    [db.products, db.customers, db.inventoryMovements, db.salesOrders, db.salesOrderItems, db.customerPayments, db.syncMetadata],
+    [
+      db.products, db.customers, db.inventoryMovements, db.salesOrders, 
+      db.salesOrderItems, db.customerPayments, db.syncMetadata,
+      db.suppliers, db.purchaseOrders, db.purchaseOrderItems
+    ],
     async () => {
       // Products
       for (const p of changes.products || []) {
-        await db.products.put({ ...p, costPrice: Number(p.costPrice), sellingPrice: Number(p.sellingPrice), minStockLevel: Number(p.minStockLevel) });
+        await db.products.put({ ...p, costPrice: Number(p.costPrice), sellingPrice: Number(p.sellingPrice), minStockLevel: Number(p.minStockLevel), syncStatus: 'SYNCED' });
       }
 
       // Customers
@@ -179,6 +209,19 @@ async function _pullRemoteChanges() {
       // Customer payments
       for (const pay of changes.payments || []) {
         await db.customerPayments.put({ ...pay, amount: Number(pay.amount), syncStatus: 'SYNCED' });
+      }
+
+      // Suppliers
+      for (const s of changes.suppliers || []) {
+        await db.suppliers.put({ ...s, syncStatus: 'SYNCED' });
+      }
+
+      // Purchase orders + items
+      for (const po of changes.purchaseOrders || []) {
+        await db.purchaseOrders.put({ ...po, syncStatus: 'SYNCED' });
+        for (const item of po.items || []) {
+          await db.purchaseOrderItems.put(item);
+        }
       }
 
       // Update watermark
