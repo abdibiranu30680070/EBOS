@@ -1,42 +1,57 @@
 // ─────────────────────────────────────────────
-// Sidebar — Left navigation rail
-// Props: activeTab, onTabChange, user
+// Sidebar — Left navigation rail & mobile drawer
 // ─────────────────────────────────────────────
 
 import { NAV_TABS } from '../../lib/constants.js';
 
-export function Sidebar({ activeModule, activeTab, onTabChange, user, isOpen }) {
+export function Sidebar({ activeModule, activeTab, onTabChange, user, isOpen, onClose }) {
   const tabs = NAV_TABS[activeModule] || [];
 
   return (
     <aside className={`
-      w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col justify-between p-4
-      fixed inset-y-0 left-0 z-30 transition-transform duration-300 md:static md:translate-x-0
-      ${isOpen ? 'translate-x-0 mt-[65px] md:mt-0' : '-translate-x-full'}
+      w-72 sm:w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col justify-between p-4
+      fixed inset-y-0 left-0 z-50 transition-transform duration-300 md:static md:translate-x-0 shadow-2xl md:shadow-none
+      ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
     `}>
+      {/* Mobile Drawer Header */}
+      <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 md:hidden">
+        <span className="font-bold text-slate-800 text-sm">Navigation Menu</span>
+        <button
+          onClick={onClose}
+          className="p-1 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-lg text-xs font-bold"
+        >
+          ✕ Close
+        </button>
+      </div>
+
       {/* Nav links */}
-      <nav className="space-y-1">
+      <nav className="space-y-1.5 overflow-y-auto">
+        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-1">
+          {activeModule} Section
+        </div>
         {tabs.map(({ id, icon, label }) => (
           <button
             key={id}
             onClick={() => onTabChange(id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors text-left ${
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-colors text-left ${
               activeTab === id
-                ? 'bg-blue-50 text-blue-700 font-bold'
+                ? 'bg-blue-50 text-blue-700 font-bold shadow-xs'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <span className="text-base opacity-80">{icon}</span>
+            <span className="text-lg opacity-90">{icon}</span>
             <span>{label}</span>
           </button>
         ))}
       </nav>
 
-      {/* User info footer */}
-      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 space-y-0.5">
-        <div className="text-slate-400 uppercase tracking-wider font-semibold text-[10px] mb-1">Signed in as</div>
-        <div className="font-bold text-slate-800 truncate">{user?.fullName ?? user?.username ?? '—'}</div>
-        <div className="text-slate-400 capitalize">{user?.role?.toLowerCase() ?? 'user'}</div>
+      {/* User info & mobile logout footer */}
+      <div className="pt-3 border-t border-slate-100 space-y-2">
+        <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 space-y-0.5">
+          <div className="text-slate-400 uppercase tracking-wider font-semibold text-[10px]">Signed in as</div>
+          <div className="font-bold text-slate-800 truncate">{user?.fullName ?? user?.username ?? '—'}</div>
+          <div className="text-slate-400 capitalize">{user?.role?.toLowerCase() ?? 'User'} • {user?.branchName ?? 'Main Branch'}</div>
+        </div>
       </div>
     </aside>
   );

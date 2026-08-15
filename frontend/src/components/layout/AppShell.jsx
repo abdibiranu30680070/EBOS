@@ -36,12 +36,13 @@ export function AppShell({
           onTabChange={(tab) => { onTabChange(tab); setSidebarOpen(false); }}
           user={user}
           isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
         
         {/* Mobile backdrop */}
         {sidebarOpen && (
           <div 
-            className="fixed inset-0 bg-slate-900/50 z-20 md:hidden" 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 md:hidden transition-opacity" 
             onClick={() => setSidebarOpen(false)} 
           />
         )}
