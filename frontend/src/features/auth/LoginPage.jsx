@@ -8,8 +8,8 @@ import { Alert }        from '../../components/ui/Alert.jsx';
 import { EbosLogo }     from '../../components/common/EbosLogo.jsx';
 import { API_BASE_URL } from '../../lib/constants.js';
 
-export function LoginPage({ isOnline, onLogin, authError, syncMessage }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
+export function LoginPage({ isOnline, onLogin, authError, syncMessage, defaultMode = 'login' }) {
+  const [mode, setMode] = useState(defaultMode); // 'login' | 'register'
 
   // Login form state
   const [businessId, setBusinessId] = useState('bus_mercato_001');

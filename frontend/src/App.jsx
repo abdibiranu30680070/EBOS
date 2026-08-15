@@ -25,6 +25,7 @@ import { AppShell }           from './components/layout/AppShell.jsx';
 import { ToastProvider }      from './components/ui/Toast.jsx';
 
 // feature pages
+import { LandingPage }        from './features/landing/LandingPage.jsx';
 import { LoginPage }          from './features/auth/LoginPage.jsx';
 import { DashboardPage }      from './features/dashboard/DashboardPage.jsx';
 import { PosPage }            from './features/pos/PosPage.jsx';
@@ -101,7 +102,7 @@ export default function App() {
   if (!user) {
     return (
       <ToastProvider>
-        <LoginPage
+        <LandingPage
           isOnline={isOnline}
           onLogin={handleLogin}
           authError={authError}

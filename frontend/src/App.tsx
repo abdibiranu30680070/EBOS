@@ -87,10 +87,23 @@ export default function App() {
   // Initial Handlers
   // -------------------------------------------------------------
   useEffect(() => {
-    // Check if token exists in localStorage
+    // Only restore session if both token and user cache are present.
+    // This keeps the login screen as the first screen on fresh app open.
+    const token = localStorage.getItem('ebos_token');
     const savedUser = localStorage.getItem('ebos_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+
+    if (!token || !savedUser) {
+      localStorage.removeItem('ebos_token');
+      localStorage.removeItem('ebos_user');
+      setUser(null);
+    } else {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('ebos_token');
+        localStorage.removeItem('ebos_user');
+        setUser(null);
+      }
     }
 
     // Network status listeners
