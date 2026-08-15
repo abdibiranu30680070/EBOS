@@ -7,6 +7,7 @@
 
 import { db } from './db.js';
 import { API_BASE_URL } from './constants.js';
+import { Network } from '@capacitor/network';
 
 // ─── Auth Header Helper ───────────────────────
 function getAuthHeaders() {
@@ -234,10 +235,24 @@ async function _pullRemoteChanges() {
 
 // ─── Background Auto-Sync ─────────────────────
 let _intervalId = null;
+let _capNetworkHandle = null;
 
 export function startAutoSync(intervalMs = 30000) {
   if (_intervalId) return;
+  
+  // Listen to browser online event
   window.addEventListener('online', _onReconnect);
+
+  // Listen to Capacitor native Android network changes
+  Network.addListener('networkStatusChange', status => {
+    if (status.connected) {
+      console.log('[SyncEngine] Native network connected — triggering instant sync.');
+      _onReconnect();
+    }
+  }).then(handle => {
+    _capNetworkHandle = handle;
+  }).catch(() => {});
+
   _intervalId = setInterval(() => {
     if (navigator.onLine && localStorage.getItem('ebos_token')) {
       console.log('[SyncEngine] Heartbeat sync...');
@@ -251,6 +266,10 @@ export function stopAutoSync() {
   if (_intervalId) {
     clearInterval(_intervalId);
     _intervalId = null;
+  }
+  if (_capNetworkHandle) {
+    _capNetworkHandle.remove();
+    _capNetworkHandle = null;
   }
   window.removeEventListener('online', _onReconnect);
   console.log('[SyncEngine] Auto-sync stopped.');
