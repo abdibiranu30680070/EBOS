@@ -38,6 +38,9 @@ export class AuthController {
     }
 
     const result = await this.authService.validateUser(username, password, businessId);
+    if (result && result.error === 'INVALID_BUSINESS_ID') {
+      throw new UnauthorizedException(`Business ID "${businessId}" not found. Please check your Business ID or register a new store.`);
+    }
     if (!result || result.error === 'INVALID_CREDENTIALS') {
       throw new UnauthorizedException('Invalid credentials');
     }

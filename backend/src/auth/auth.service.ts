@@ -11,6 +11,14 @@ export class AuthService {
   ) {}
 
   async validateUser(username: string, pass: string, businessId: string): Promise<any> {
+    const business = await this.prisma.business.findUnique({
+      where: { id: businessId },
+    });
+
+    if (!business) {
+      return { error: 'INVALID_BUSINESS_ID' };
+    }
+
     const user = await this.prisma.user.findFirst({
       where: {
         username,

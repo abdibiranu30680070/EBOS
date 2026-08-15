@@ -9,11 +9,31 @@ export class BusinessService {
   async registerBusiness(data: any) {
     const { businessName, tin, ownerName, phone, username, password } = data;
 
-    // Optional: verify TIN uniqueness if provided
-    if (tin) {
-      const existing = await this.prisma.business.findUnique({ where: { tin } });
-      if (existing) {
-        throw new ConflictException('A business with this TIN already exists.');
+    // 1. Verify business name uniqueness
+    const existingName = await this.prisma.business.findFirst({
+      where: { name: { equals: businessName.trim(), mode: 'insensitive' } },
+    });
+    if (existingName) {
+      throw new ConflictException(`A business named "${businessName}" already exists. If this is your store, please sign in using your Business ID (${existingName.id}).`);
+    }
+
+    // 2. Verify TIN uniqueness if provided
+    if (tin && tin.trim()) {
+      const existingTin = await this.prisma.business.findFirst({
+        where: { tin: tin.trim() },
+      });
+      if (existingTin) {
+        throw new ConflictException(`A business with TIN "${tin}" already exists. Please sign in using your Business ID (${existingTin.id}).`);
+      }
+    }
+
+    // 3. Verify username uniqueness
+    if (username) {
+      const existingUser = await this.prisma.user.findFirst({
+        where: { username: username.trim() },
+      });
+      if (existingUser) {
+        throw new ConflictException(`Username "${username}" is already registered. Please choose a different username.`);
       }
     }
 
