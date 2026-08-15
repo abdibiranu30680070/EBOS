@@ -2,7 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Forbi
 import { Reflector } from '@nestjs/core';
 import { AuthService } from './auth.service';
 import { ROLES_KEY } from './roles.decorator';
-import { UserRole } from '../generated/prisma/client';
+import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
