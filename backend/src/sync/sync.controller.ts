@@ -10,17 +10,30 @@ export class SyncController {
 
   @Get('pull')
   async pull(@Request() req: any, @Query('lastSyncedAt') lastSyncedAtStr?: string) {
-    const { businessId, branchId } = req.user;
+    const { businessId, branchId } = req.user || {};
+
+    if (!businessId) {
+      return {
+        serverTime: new Date().toISOString(),
+        changes: { products: [], customers: [], inventoryMovements: [], salesOrders: [], payments: [], suppliers: [], purchaseOrders: [] }
+      };
+    }
+
     // Handle empty or invalid lastSyncedAt
     const lastSyncedAt = lastSyncedAtStr && !isNaN(Date.parse(lastSyncedAtStr)) 
       ? new Date(lastSyncedAtStr) 
       : new Date(0);
+
+    const branchFilter = branchId ? { branchId } : { branch: { businessId } };
 
     const products = await this.prisma.product.findMany({
       where: {
         businessId,
         updatedAt: { gt: lastSyncedAt },
       },
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching products:', err.message);
+      return [];
     });
 
     const customers = await this.prisma.customer.findMany({
@@ -28,23 +41,32 @@ export class SyncController {
         businessId,
         updatedAt: { gt: lastSyncedAt },
       },
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching customers:', err.message);
+      return [];
     });
 
     const inventoryMovements = await this.prisma.inventoryMovement.findMany({
       where: {
-        branchId,
+        ...branchFilter,
         createdAt: { gt: lastSyncedAt },
       },
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching inventoryMovements:', err.message);
+      return [];
     });
 
     const salesOrders = await this.prisma.salesOrder.findMany({
       where: {
-        branchId,
+        ...branchFilter,
         updatedAt: { gt: lastSyncedAt },
       },
       include: {
         items: true,
       },
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching salesOrders:', err.message);
+      return [];
     });
 
     const payments = await this.prisma.customerPayment.findMany({
@@ -52,6 +74,9 @@ export class SyncController {
         businessId,
         createdAt: { gt: lastSyncedAt },
       },
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching payments:', err.message);
+      return [];
     });
 
     const suppliers = await this.prisma.supplier.findMany({
@@ -59,16 +84,22 @@ export class SyncController {
         businessId,
         updatedAt: { gt: lastSyncedAt },
       },
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching suppliers (table may be missing):', err.message);
+      return [];
     });
 
     const purchaseOrders = await this.prisma.purchaseOrder.findMany({
       where: {
-        branchId,
+        ...branchFilter,
         updatedAt: { gt: lastSyncedAt },
       },
       include: {
         items: true,
       },
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching purchaseOrders (table may be missing):', err.message);
+      return [];
     });
 
     return {
