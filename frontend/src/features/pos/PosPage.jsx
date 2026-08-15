@@ -17,7 +17,7 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
   const [mobileCartOpen, setMobileCartOpen]   = useState(false);
 
   const {
-    cart, addToCart, updateCartQty,
+    cart, addToCart, updateCartQty, setCartQty,
     selectedCustomerId, setSelectedCustomerId,
     discountAmount,     setDiscountAmount,
     paidAmount,         setPaidAmount,
@@ -104,6 +104,7 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
               checkoutError={checkoutError}
               onAddToCart={addToCart}
               onUpdateQty={updateCartQty}
+              onSetQty={setCartQty}
               onCheckout={onCheckoutClick}
               onShowAddCustomer={() => setShowAddCustomer(true)}
             />

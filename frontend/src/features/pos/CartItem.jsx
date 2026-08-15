@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────
 // CartItem — Single row in the cart panel
-// Props: item { product, quantity }, onIncrement, onDecrement
+// Props: item { product, quantity }, onIncrement, onDecrement, onSetQty
 // ─────────────────────────────────────────────
 
-export function CartItem({ item, onIncrement, onDecrement }) {
+export function CartItem({ item, onIncrement, onDecrement, onSetQty }) {
   const { product, quantity } = item;
   const lineTotal = product.sellingPrice * quantity;
 
@@ -17,8 +17,8 @@ export function CartItem({ item, onIncrement, onDecrement }) {
         </div>
       </div>
 
-      {/* Qty controls */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      {/* Qty controls with direct numerical input */}
+      <div className="flex items-center gap-1 shrink-0">
         <button
           onClick={() => onDecrement(product.id)}
           className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-bold text-base transition-colors cursor-pointer"
@@ -26,7 +26,15 @@ export function CartItem({ item, onIncrement, onDecrement }) {
         >
           −
         </button>
-        <span className="w-6 text-center text-sm font-bold text-slate-800">{quantity}</span>
+        <input
+          type="number"
+          min="1"
+          step="any"
+          value={quantity}
+          onChange={(e) => onSetQty?.(product.id, e.target.value)}
+          onClick={(e) => e.target.select()}
+          className="w-14 text-center text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded py-1 px-1 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        />
         <button
           onClick={() => onIncrement(product)}
           className="w-7 h-7 flex items-center justify-center bg-blue-100 hover:bg-blue-200 rounded text-blue-700 font-bold text-base transition-colors cursor-pointer"

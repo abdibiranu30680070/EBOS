@@ -18,6 +18,7 @@ export function CartTerminal({
   checkoutError,
   onAddToCart,
   onUpdateQty,
+  onSetQty,
   onCheckout,
   onShowAddCustomer,
 }) {
@@ -47,6 +48,7 @@ export function CartTerminal({
               item={item}
               onIncrement={onAddToCart}
               onDecrement={(productId) => onUpdateQty(productId, -1)}
+              onSetQty={onSetQty}
             />
           ))
         )}

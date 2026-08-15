@@ -52,6 +52,19 @@ export function useCart({ user, customers }) {
     );
   };
 
+  const setCartQty = (productId, qty) => {
+    const num = Number(qty);
+    if (isNaN(num) || num <= 0) {
+      setCart(prev => prev.filter(item => item.product.id !== productId));
+    } else {
+      setCart(prev =>
+        prev.map(item =>
+          item.product.id === productId ? { ...item, quantity: num } : item
+        )
+      );
+    }
+  };
+
   const clearCart = () => {
     setCart([]);
     setDiscountAmount(0);
@@ -179,6 +192,6 @@ export function useCart({ user, customers }) {
     // Setters
     setSelectedCustomerId, setDiscountAmount, setPaidAmount, setPaymentMode,
     // Actions
-    addToCart, updateCartQty, clearCart, handleCheckout,
+    addToCart, updateCartQty, setCartQty, clearCart, handleCheckout,
   };
 }
