@@ -89,6 +89,7 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
             </button>
             
             <CartTerminal
+              products={products}
               cart={cart}
               customers={customers}
               selectedCustomerId={selectedCustomerId}

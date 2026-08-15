@@ -9,6 +9,7 @@ import { generateId } from '../../lib/generateId.js';
 import { syncNow } from '../../lib/syncEngine.js';
 import { DEFAULT_BRANCH_ID } from '../../lib/constants.js';
 import { FormField, selectClass, inputClass } from '../../components/ui/FormField.jsx';
+import { SearchableProductSelect } from '../../components/common/SearchableProductSelect.jsx';
 
 export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
   const [supplierId, setSupplierId] = useState('');
@@ -101,15 +102,12 @@ export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
         </FormField>
 
         <FormField label="Product" required>
-          <select
-            className={selectClass}
-            value={productId}
-            onChange={e => setProductId(e.target.value)}
-            required
-          >
-            <option value="">— Select Product —</option>
-            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <SearchableProductSelect
+            products={products}
+            selectedProductId={productId}
+            onSelect={setProductId}
+            placeholder="🔍 Type product name or SKU..."
+          />
         </FormField>
 
         <div className="grid grid-cols-2 gap-4">

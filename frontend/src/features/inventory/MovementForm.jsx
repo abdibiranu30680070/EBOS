@@ -9,6 +9,7 @@ import { generateId }                        from '../../lib/generateId.js';
 import { syncNow }                           from '../../lib/syncEngine.js';
 import { MOVEMENT_TYPES, DEFAULT_BRANCH_ID } from '../../lib/constants.js';
 import { FormField, selectClass, inputClass, textareaClass } from '../../components/ui/FormField.jsx';
+import { SearchableProductSelect }           from '../../components/common/SearchableProductSelect.jsx';
 
 export function MovementForm({ products, user, onSuccess }) {
   const [productId, setProductId] = useState('');
@@ -65,18 +66,12 @@ export function MovementForm({ products, user, onSuccess }) {
         )}
 
         <FormField label="Product" required>
-          <select
-            id="inv-product-select"
-            className={selectClass}
-            value={productId}
-            onChange={e => setProductId(e.target.value)}
-            required
-          >
-            <option value="">— Select a product —</option>
-            {products.map(p => (
-              <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-            ))}
-          </select>
+          <SearchableProductSelect
+            products={products}
+            selectedProductId={productId}
+            onSelect={setProductId}
+            placeholder="🔍 Type product name or SKU..."
+          />
         </FormField>
 
         <FormField label="Movement Type" required>
