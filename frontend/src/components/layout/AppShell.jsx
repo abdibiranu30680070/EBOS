@@ -38,6 +38,7 @@ export function AppShell({
           isOnline={isOnline}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          onLogout={onLogout}
         />
         
         {/* Mobile backdrop */}

@@ -4,7 +4,7 @@
 
 import { NAV_TABS } from '../../lib/constants.js';
 
-export function Sidebar({ activeModule, activeTab, onTabChange, user, isOnline, isOpen, onClose }) {
+export function Sidebar({ activeModule, activeTab, onTabChange, user, isOnline, isOpen, onClose, onLogout }) {
   const tabs = NAV_TABS[activeModule] || [];
 
   return (
@@ -59,6 +59,13 @@ export function Sidebar({ activeModule, activeTab, onTabChange, user, isOnline, 
           <div className="font-bold text-slate-800 truncate">{user?.fullName ?? user?.username ?? '—'}</div>
           <div className="text-slate-400 capitalize">{user?.role?.toLowerCase() ?? 'User'} • {user?.branchName ?? 'Main Branch'}</div>
         </div>
+
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs py-2.5 px-3 rounded-xl border border-rose-200 transition-colors cursor-pointer"
+        >
+          <span>🚪 Log Out</span>
+        </button>
       </div>
     </aside>
   );

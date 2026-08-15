@@ -52,6 +52,7 @@ export function AddProductModal({ isOpen, onClose, user, onSuccess }) {
         minStockLevel:  Number(form.minStockLevel) || 0,
         unitOfMeasure:  form.unitOfMeasure,
         isActive:       1,
+        syncStatus:     'PENDING',
       });
 
       syncNow();

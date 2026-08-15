@@ -82,9 +82,11 @@ export function Header({ user, isOnline, syncing, activeModule, onModuleChange, 
         {/* Logout Button */}
         <button
           onClick={onLogout}
-          className="hidden sm:block bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-semibold text-xs px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+          title="Logout"
         >
-          Logout
+          <span className="sm:hidden">🚪</span>
+          <span className="hidden sm:inline">Logout</span>
         </button>
       </div>
     </header>
