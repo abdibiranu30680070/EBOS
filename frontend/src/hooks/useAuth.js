@@ -1,11 +1,7 @@
-// ─────────────────────────────────────────────
-// useAuth — Login, logout, offline session cache
-// Returns: { user, authError, handleLogin, handleLogout }
-// ─────────────────────────────────────────────
-
-import { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../lib/constants.js';
-import { syncNow } from '../lib/syncEngine.js';
+import { useState, useEffect }  from 'react';
+import { API_BASE_URL }        from '../lib/constants.js';
+import { syncNow }             from '../lib/syncEngine.js';
+import { clearDatabaseData }   from '../lib/db.js';
 
 async function hashPassword(password) {
   const msgBuffer = new TextEncoder().encode(password);
@@ -33,7 +29,7 @@ export function useAuth({ isOnline, setSyncMessage }) {
   /**
    * Handles login form submission.
    * Online: calls backend API, caches token + user + hashed password.
-   * Offline: checks previously cached credentials.
+   * Clears old business data if switching to a new business ID.
    */
   const handleLogin = async ({ businessId, username, password }) => {
     setAuthError('');
@@ -55,6 +51,15 @@ export function useAuth({ isOnline, setSyncMessage }) {
         }
 
         const data = await res.json();
+        
+        // Multi-tenant isolation: Clear local IndexedDB if switching to a different business
+        const prevBusinessId = localStorage.getItem('ebos_active_business_id');
+        if (prevBusinessId !== data.user.businessId) {
+          console.log(`[Auth] New business detected (${data.user.businessId}). Clearing old local data.`);
+          await clearDatabaseData();
+          localStorage.setItem('ebos_active_business_id', data.user.businessId);
+        }
+
         localStorage.setItem('ebos_token', data.access_token);
         
         // Cache user info and securely cache hashed password for offline fallback
@@ -62,10 +67,10 @@ export function useAuth({ isOnline, setSyncMessage }) {
         localStorage.setItem('ebos_user', JSON.stringify(cacheData));
         setUser(data.user);
 
-        // Immediately sync after login to populate local DB
+        // Immediately sync after login to populate local DB with this business's data ONLY
         const syncResult = await syncNow();
         if (syncResult.success) {
-          setSyncMessage({ type: 'success', text: 'Logged in and database synced!' });
+          setSyncMessage({ type: 'success', text: 'Logged in! Business data isolated & synced.' });
         }
       } catch (err) {
         setAuthError(err.message || 'Network error. Could not reach auth server.');
@@ -81,7 +86,6 @@ export function useAuth({ isOnline, setSyncMessage }) {
           cachedUser.businessId === businessId && 
           cachedUser.offlineHash === hashedInput
         ) {
-          // Do not leak offlineHash into memory state
           const { offlineHash, ...safeUser } = cachedUser;
           setUser(safeUser);
           setSyncMessage({ type: 'warning', text: 'Offline login. Sync will resume when connected.' });
@@ -98,9 +102,11 @@ export function useAuth({ isOnline, setSyncMessage }) {
   /**
    * Clears all session data and resets user state.
    */
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('ebos_token');
     localStorage.removeItem('ebos_user');
+    localStorage.removeItem('ebos_active_business_id');
+    await clearDatabaseData();
     setUser(null);
   };
 

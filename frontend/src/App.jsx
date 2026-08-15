@@ -37,11 +37,21 @@ import { ReportsPage }        from './features/reports/ReportsPage.jsx';
 import { SettingsPage }       from './features/settings/SettingsPage.jsx';
 import { PurchasesPage }      from './features/purchases/PurchasesPage.jsx';
 
-// ─── Live DB queries (app-level shared data) ──
-function useAppData() {
-  const products  = useLiveQuery(() => db.products.where('isActive').equals(1).toArray()) || [];
-  const customers = useLiveQuery(() => db.customers.toArray()) || [];
-  const orders    = useLiveQuery(() => db.salesOrders.orderBy('createdAt').reverse().limit(50).toArray()) || [];
+// ─── Live DB queries (app-level shared data filtered per business) ──
+function useAppData(user) {
+  const busId = user?.businessId;
+  const products  = useLiveQuery(
+    () => busId ? db.products.filter(p => p.businessId === busId && p.isActive === 1).toArray() : [],
+    [busId]
+  ) || [];
+  const customers = useLiveQuery(
+    () => busId ? db.customers.filter(c => c.businessId === busId).toArray() : [],
+    [busId]
+  ) || [];
+  const orders    = useLiveQuery(
+    () => busId ? db.salesOrders.orderBy('createdAt').reverse().filter(o => o.businessId === busId || !o.businessId).limit(50).toArray() : [],
+    [busId]
+  ) || [];
   return { products, customers, orders };
 }
 
@@ -94,7 +104,7 @@ export default function App() {
   const { syncing, syncMessage, triggerSync, clearSyncMessage, setSyncMessage } = useSync();
   const { user, authError, handleLogin, handleLogout } = useAuth({ isOnline, setSyncMessage });
 
-  const { products, customers, orders } = useAppData();
+  const { products, customers, orders } = useAppData(user);
   const { stockBalances }               = useStockBalances();
   const cartHook                        = useCart({ user, customers });
 

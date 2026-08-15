@@ -31,3 +31,19 @@ class EbosDatabase extends Dexie {
 }
 
 export const db = new EbosDatabase();
+
+export async function clearDatabaseData() {
+  console.log('[DB] Clearing local IndexedDB storage for business data isolation...');
+  await Promise.all([
+    db.products.clear(),
+    db.customers.clear(),
+    db.inventoryMovements.clear(),
+    db.salesOrders.clear(),
+    db.salesOrderItems.clear(),
+    db.customerPayments.clear(),
+    db.suppliers.clear(),
+    db.purchaseOrders.clear(),
+    db.purchaseOrderItems.clear(),
+    db.syncMetadata.clear(),
+  ]);
+}
