@@ -64,7 +64,7 @@ export function ProductsPage({ user }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: 'Total Products', value: allProducts.length, color: 'text-slate-800' },
             { label: 'Active', value: activeCount, color: 'text-emerald-600' },

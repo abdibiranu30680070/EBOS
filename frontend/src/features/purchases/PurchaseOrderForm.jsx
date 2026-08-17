@@ -186,12 +186,10 @@ export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
               const subtotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0);
 
               return (
-                <div key={line.id} className="p-3 bg-white flex flex-col sm:flex-row items-center gap-3 hover:bg-slate-50/80 transition-colors">
-                  {/* Line index badge */}
-                  <span className="text-xs font-extrabold text-slate-400 w-6 shrink-0 text-center">{index + 1}</span>
+                <div key={line.id} className="p-3 bg-white grid grid-cols-1 gap-3 sm:grid-cols-[24px_minmax(0,1.4fr)_80px_110px_90px_auto] sm:items-center hover:bg-slate-50/80 transition-colors">
+                  <span className="text-xs font-extrabold text-slate-400 w-6 shrink-0 text-center sm:mx-auto">{index + 1}</span>
 
-                  {/* Product selector */}
-                  <div className="flex-1 min-w-0 w-full">
+                  <div className="min-w-0 w-full">
                     <SearchableProductSelect
                       products={products}
                       selectedProductId={line.productId}
@@ -200,7 +198,6 @@ export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
                     />
                   </div>
 
-                  {/* Quantity input */}
                   <div className="w-full sm:w-24 shrink-0">
                     <input
                       type="number"
@@ -214,7 +211,6 @@ export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
                     />
                   </div>
 
-                  {/* Unit cost input */}
                   <div className="w-full sm:w-32 shrink-0">
                     <div className="relative">
                       <span className="absolute left-2.5 top-2 text-[10px] text-slate-400 font-bold">ETB</span>
@@ -231,16 +227,14 @@ export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
                     </div>
                   </div>
 
-                  {/* Line subtotal */}
                   <div className="w-full sm:w-28 text-right font-extrabold text-xs text-slate-800 shrink-0">
                     ETB {subtotal.toLocaleString()}
                   </div>
 
-                  {/* Remove line button */}
                   <button
                     type="button"
                     onClick={() => removeLine(line.id)}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 cursor-pointer"
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 cursor-pointer justify-self-end sm:justify-self-auto"
                     title="Remove line"
                   >
                     🗑️
