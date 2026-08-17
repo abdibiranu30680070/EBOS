@@ -79,29 +79,6 @@ export class SyncController {
       return [];
     });
 
-    const suppliers = await this.prisma.supplier.findMany({
-      where: {
-        businessId,
-        updatedAt: { gt: lastSyncedAt },
-      },
-    }).catch(err => {
-      console.warn('[SyncPull] Error fetching suppliers (table may be missing):', err.message);
-      return [];
-    });
-
-    const purchaseOrders = await this.prisma.purchaseOrder.findMany({
-      where: {
-        ...branchFilter,
-        updatedAt: { gt: lastSyncedAt },
-      },
-      include: {
-        items: true,
-      },
-    }).catch(err => {
-      console.warn('[SyncPull] Error fetching purchaseOrders (table may be missing):', err.message);
-      return [];
-    });
-
     return {
       serverTime: new Date().toISOString(),
       changes: {
@@ -110,8 +87,8 @@ export class SyncController {
         inventoryMovements,
         salesOrders,
         payments,
-        suppliers,
-        purchaseOrders,
+        suppliers: [],
+        purchaseOrders: [],
       },
     };
   }
@@ -130,13 +107,11 @@ export class SyncController {
       branchId = branch?.id || null;
     }
 
-    const { 
-      customers = [], 
-      salesOrders = [], 
-      inventoryMovements = [], 
+    const {
+      customers = [],
+      salesOrders = [],
+      inventoryMovements = [],
       payments = [],
-      suppliers = [],
-      purchaseOrders = []
     } = body;
 
     let results: any;
@@ -146,59 +121,6 @@ export class SyncController {
       const syncedOrderIds: string[] = [];
       const syncedMovementIds: string[] = [];
       const syncedPaymentIds: string[] = [];
-      const syncedSupplierIds: string[] = [];
-      const syncedPurchaseOrderIds: string[] = [];
-
-      // Process Suppliers
-      for (const supplier of suppliers) {
-        await tx.supplier.upsert({
-          where: { id: supplier.id },
-          update: {
-            name: supplier.name,
-            phone: supplier.phone || null,
-            email: supplier.email || null,
-            address: supplier.address || null,
-          },
-          create: {
-            id: supplier.id,
-            businessId,
-            name: supplier.name,
-            phone: supplier.phone || null,
-            email: supplier.email || null,
-            address: supplier.address || null,
-          },
-        });
-        syncedSupplierIds.push(supplier.id);
-      }
-
-      // Process Purchase Orders
-      for (const po of purchaseOrders) {
-        const existingPo = await tx.purchaseOrder.findUnique({
-          where: { id: po.id },
-        });
-
-        if (!existingPo) {
-          await tx.purchaseOrder.create({
-            data: {
-              id: po.id,
-              branchId,
-              supplierId: po.supplierId,
-              createdAt: new Date(po.createdAt),
-            },
-          });
-
-          for (const item of po.items || []) {
-            await tx.purchaseOrderItem.create({
-              data: {
-                id: item.id,
-                orderId: po.id,
-                productId: item.productId,
-              },
-            });
-          }
-        }
-        syncedPurchaseOrderIds.push(po.id);
-      }
 
       // Process Customers
       for (const customer of customers) {
@@ -344,8 +266,6 @@ export class SyncController {
             ordersCount: salesOrders.length,
             movementsCount: inventoryMovements.length,
             paymentsCount: payments.length,
-            suppliersCount: suppliers.length,
-            poCount: purchaseOrders.length,
           }),
         },
       });
@@ -355,8 +275,6 @@ export class SyncController {
         salesOrders: syncedOrderIds,
         inventoryMovements: syncedMovementIds,
         payments: syncedPaymentIds,
-        suppliers: syncedSupplierIds,
-        purchaseOrders: syncedPurchaseOrderIds,
       };
       });
     } catch (err: any) {
