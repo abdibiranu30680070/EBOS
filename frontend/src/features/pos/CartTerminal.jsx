@@ -26,16 +26,19 @@ export function CartTerminal({
     <div className="bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm overflow-hidden h-full">
       {/* Panel header */}
       <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0">
-        <span className="font-bold text-slate-800 text-sm">🛒 Cart Terminal</span>
+        <span className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+          <span>📋</span>
+          <span>Order Lines</span>
+        </span>
         {cart.length > 0 && (
-          <span className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">
+          <span className="text-xs bg-blue-100 text-blue-700 font-bold px-2.5 py-0.5 rounded-full">
             {cart.reduce((s, i) => s + i.quantity, 0)} items
           </span>
         )}
       </div>
 
-      {/* Direct Quantity & Product Selection Form */}
-      <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-200 shrink-0 space-y-1">
+      {/* Direct Quantity & Product Selection Form (Order Line Builder) */}
+      <div className="px-4 py-3 bg-slate-50/90 border-b border-slate-200 shrink-0 space-y-2">
         <div className="flex items-center gap-2">
           {/* Quantity Input Field */}
           <div className="w-20 shrink-0">
@@ -53,7 +56,7 @@ export function CartTerminal({
 
           {/* Product Select Input Field */}
           <div className="flex-1 min-w-0">
-            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Product</label>
+            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-0.5">Product Line</label>
             <SearchableProductSelect
               products={products}
               selectedProductId=""
@@ -71,12 +74,12 @@ export function CartTerminal({
         </div>
       </div>
 
-      {/* Cart item list */}
+      {/* Cart item list (Order Lines Table) */}
       <div className="flex-1 overflow-y-auto px-4 pt-2 pb-2 min-h-0 space-y-2">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-slate-400 text-sm gap-1">
-            <span className="text-3xl">🛒</span>
-            Cart is empty. Select a product or click "Add a line" below.
+            <span className="text-3xl">📋</span>
+            No order lines yet. Select a product or click "Add a line" below.
           </div>
         ) : (
           cart.map(item => (
@@ -97,7 +100,7 @@ export function CartTerminal({
             const selectEl = document.getElementById('pos-product-select-btn') || document.querySelector('.searchable-product-select button');
             if (selectEl) selectEl.focus();
           }}
-          className="w-full py-2 px-3 bg-slate-50 hover:bg-blue-50 border-2 border-dashed border-slate-300 hover:border-blue-500 text-blue-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs mt-2"
+          className="w-full py-2.5 px-3 bg-white hover:bg-blue-50 border-2 border-dashed border-blue-300 hover:border-blue-500 text-blue-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs mt-2"
         >
           <span className="text-sm font-extrabold">➕</span>
           <span>Add a line</span>

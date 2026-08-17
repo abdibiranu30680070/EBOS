@@ -45,9 +45,19 @@ export function CartItem({ item, onIncrement, onDecrement, onSetQty }) {
       </div>
 
       {/* Line total */}
-      <div className="text-sm font-bold text-slate-800 w-20 text-right shrink-0">
+      <div className="text-sm font-extrabold text-slate-800 w-20 text-right shrink-0">
         ETB {lineTotal.toLocaleString()}
       </div>
+
+      {/* Delete order line button */}
+      <button
+        type="button"
+        onClick={() => onSetQty?.(product.id, 0)}
+        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+        title="Remove order line"
+      >
+        🗑️
+      </button>
     </div>
   );
 }
