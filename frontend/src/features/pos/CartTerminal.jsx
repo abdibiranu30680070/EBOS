@@ -72,11 +72,11 @@ export function CartTerminal({
       </div>
 
       {/* Cart item list */}
-      <div className="flex-1 overflow-y-auto px-4 pt-2 pb-0 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 pt-2 pb-2 min-h-0 space-y-2">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-slate-400 text-sm gap-1">
             <span className="text-3xl">🛒</span>
-            Cart is empty. Click a product to add it.
+            Cart is empty. Select a product or click "Add a line" below.
           </div>
         ) : (
           cart.map(item => (
@@ -89,6 +89,19 @@ export function CartTerminal({
             />
           ))
         )}
+
+        {/* Odoo Style "Add a line" Action Button */}
+        <button
+          type="button"
+          onClick={() => {
+            const selectEl = document.getElementById('pos-product-select-btn') || document.querySelector('.searchable-product-select button');
+            if (selectEl) selectEl.focus();
+          }}
+          className="w-full py-2 px-3 bg-slate-50 hover:bg-blue-50 border-2 border-dashed border-slate-300 hover:border-blue-500 text-blue-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs mt-2"
+        >
+          <span className="text-sm font-extrabold">➕</span>
+          <span>Add a line</span>
+        </button>
       </div>
 
       {/* Checkout form */}
