@@ -131,6 +131,7 @@ export class SyncController {
     }
 
     const {
+      products = [],
       customers = [],
       salesOrders = [],
       inventoryMovements = [],
@@ -142,12 +143,41 @@ export class SyncController {
     let results: any;
     try {
       results = await this.prisma.$transaction(async (tx: any) => {
+      const syncedProductIds: string[] = [];
       const syncedCustomerIds: string[] = [];
       const syncedOrderIds: string[] = [];
       const syncedMovementIds: string[] = [];
       const syncedPaymentIds: string[] = [];
       const syncedSupplierIds: string[] = [];
       const syncedPurchaseOrderIds: string[] = [];
+
+      // Process Products
+      for (const product of products) {
+        await tx.product.upsert({
+          where: { id: product.id },
+          update: {
+            sku: product.sku,
+            name: product.name,
+            costPrice: product.costPrice,
+            sellingPrice: product.sellingPrice,
+            minStockLevel: product.minStockLevel || 0,
+            unitOfMeasure: product.unitOfMeasure || 'Pcs',
+            isActive: product.isActive !== undefined ? product.isActive : true,
+          },
+          create: {
+            id: product.id,
+            businessId,
+            sku: product.sku,
+            name: product.name,
+            costPrice: product.costPrice,
+            sellingPrice: product.sellingPrice,
+            minStockLevel: product.minStockLevel || 0,
+            unitOfMeasure: product.unitOfMeasure || 'Pcs',
+            isActive: product.isActive !== undefined ? product.isActive : true,
+          },
+        });
+        syncedProductIds.push(product.id);
+      }
 
       // Process Suppliers
       for (const supplier of suppliers) {
@@ -341,6 +371,7 @@ export class SyncController {
           userId,
           action: 'SYNC_PUSH',
           payload: JSON.stringify({
+            productsCount: products.length,
             ordersCount: salesOrders.length,
             movementsCount: inventoryMovements.length,
             paymentsCount: payments.length,
@@ -351,6 +382,7 @@ export class SyncController {
       });
 
       return {
+        products: syncedProductIds,
         customers: syncedCustomerIds,
         salesOrders: syncedOrderIds,
         inventoryMovements: syncedMovementIds,
