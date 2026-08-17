@@ -21,7 +21,7 @@ class EbosDatabase extends Dexie {
     });
 
     this.version(2).stores({
-      users: 'id, branchId, role, syncStatus',
+      users: 'id, businessId, branchId, role, syncStatus',
       suppliers: 'id, businessId, name, syncStatus',
       purchaseOrders: 'id, branchId, supplierId, syncStatus, createdAt',
       purchaseOrderItems: 'id, orderId, productId',
