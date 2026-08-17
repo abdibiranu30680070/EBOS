@@ -29,6 +29,23 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
     const pendingOrders = await db.salesOrders.where('syncStatus').equals('PENDING').toArray();
     const pendingPayments = await db.customerPayments.where('syncStatus').equals('PENDING').toArray();
     const pendingMovements = await db.inventoryMovements.where('syncStatus').equals('PENDING').toArray();
+    const pendingBranches = await db.branches.where('syncStatus').equals('PENDING').toArray();
+    const pendingUsers = await db.users.where('syncStatus').equals('PENDING').toArray();
+
+    console.log('Pending counts:', {
+      customers: pendingCustomers.length,
+      orders: pendingOrders.length,
+      payments: pendingPayments.length,
+      movements: pendingMovements.length,
+      branches: pendingBranches.length,
+      users: pendingUsers.length
+    });
+
+    // Also check total counts in local DB
+    const totalCustomers = await db.customers.count();
+    const totalOrders = await db.salesOrders.count();
+    const totalProducts = await db.products.count();
+    console.log('Total local DB counts:', { customers: totalCustomers, orders: totalOrders, products: totalProducts });
 
     // Enrich orders with their items
     const ordersWithItems = [];
@@ -46,37 +63,13 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
       });
     }
 
-    // Sync pending local users
-    const pendingUsers = await db.users.where('syncStatus').equals('PENDING').toArray().catch(() => []);
-    if (pendingUsers && pendingUsers.length > 0) {
-      for (const u of pendingUsers) {
-        try {
-          const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username: u.username,
-              password: u.password || 'default123',
-              fullName: u.username,
-              role: u.role || 'CASHIER',
-              businessId: u.businessId || 'bus_mercato_001',
-              branchId: u.branchId || 'br_mercato_main',
-            }),
-          });
-          if (res.ok || res.status === 400 || res.status === 409) {
-            await db.users.update(u.id, { syncStatus: 'SYNCED' });
-          }
-        } catch (err) {
-          console.warn('Failed to push pending user:', u.username, err);
-        }
-      }
-    }
-
     if (
       pendingCustomers.length > 0 ||
       ordersWithItems.length > 0 ||
       pendingPayments.length > 0 ||
-      pendingMovements.length > 0
+      pendingMovements.length > 0 ||
+      pendingBranches.length > 0 ||
+      pendingUsers.length > 0
     ) {
       console.log('Pushing local modifications to server...');
       const headers: Record<string, string> = {
@@ -90,7 +83,9 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
           customers: pendingCustomers,
           salesOrders: ordersWithItems,
           payments: pendingPayments,
-          inventoryMovements: pendingMovements
+          inventoryMovements: pendingMovements,
+          branches: pendingBranches,
+          users: pendingUsers
         })
       });
 
@@ -101,11 +96,11 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
       const pushResult = await pushResponse.json();
       console.log('Push response:', pushResult);
       if (pushResult.success && pushResult.synced) {
-        const { customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts } = pushResult.synced;
-        console.log('Synced IDs:', { syncedCusts, syncedOrders, syncedMvs, syncedPmts });
+        const { customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts, branches: syncedBranches, users: syncedUsers } = pushResult.synced;
+        console.log('Synced IDs:', { syncedCusts, syncedOrders, syncedMvs, syncedPmts, syncedBranches, syncedUsers });
 
         // Mark pushed records as SYNCED
-        await db.transaction('rw', [db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements], async () => {
+        await db.transaction('rw', [db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements, db.branches, db.users], async () => {
           if (syncedCusts.length > 0) {
             await Promise.all(syncedCusts.map((id: string) => db.customers.update(id, { syncStatus: 'SYNCED' })));
           }
@@ -117,6 +112,12 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
           }
           if (syncedMvs.length > 0) {
             await Promise.all(syncedMvs.map((id: string) => db.inventoryMovements.update(id, { syncStatus: 'SYNCED' })));
+          }
+          if (syncedBranches.length > 0) {
+            await Promise.all(syncedBranches.map((id: string) => db.branches.update(id, { syncStatus: 'SYNCED' })));
+          }
+          if (syncedUsers.length > 0) {
+            await Promise.all(syncedUsers.map((id: string) => db.users.update(id, { syncStatus: 'SYNCED' })));
           }
         });
         console.log('Successfully pushed local changes.');
@@ -147,7 +148,7 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
     // Apply downloaded updates to the local database in a transaction
     await db.transaction(
       'rw',
-      [db.products, db.customers, db.inventoryMovements, db.salesOrders, db.salesOrderItems, db.customerPayments, db.syncMetadata],
+      [db.products, db.customers, db.inventoryMovements, db.salesOrders, db.salesOrderItems, db.customerPayments, db.branches, db.users, db.syncMetadata],
       async () => {
         // Save Products
         for (const product of changes.products || []) {
@@ -230,6 +231,31 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
             paymentMode: payment.paymentMode,
             referenceNumber: payment.referenceNumber,
             createdAt: payment.createdAt,
+            syncStatus: 'SYNCED'
+          });
+        }
+
+        // Save branches
+        for (const branch of changes.branches || []) {
+          await db.branches.put({
+            id: branch.id,
+            businessId: branch.businessId,
+            name: branch.name,
+            location: branch.location || null,
+            isActive: branch.isActive,
+            syncStatus: 'SYNCED'
+          });
+        }
+
+        // Save users
+        for (const user of changes.users || []) {
+          await db.users.put({
+            id: user.id,
+            username: user.username,
+            password: user.password || null,
+            role: user.role,
+            branchId: user.branchId || null,
+            businessId: user.businessId || null,
             syncStatus: 'SYNCED'
           });
         }

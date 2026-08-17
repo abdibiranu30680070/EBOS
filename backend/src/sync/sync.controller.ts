@@ -137,7 +137,9 @@ export class SyncController {
       inventoryMovements = [],
       payments = [],
       suppliers = [],
-      purchaseOrders = []
+      purchaseOrders = [],
+      branches = [],
+      users = []
     } = body;
 
     let results: any;
@@ -150,6 +152,8 @@ export class SyncController {
       const syncedPaymentIds: string[] = [];
       const syncedSupplierIds: string[] = [];
       const syncedPurchaseOrderIds: string[] = [];
+      const syncedBranchIds: string[] = [];
+      const syncedUserIds: string[] = [];
 
       // Process Products
       for (const product of products) {
@@ -458,6 +462,47 @@ export class SyncController {
         syncedMovementIds.push(movement.id);
       }
 
+      // Process Branches
+      for (const branch of branches) {
+        await tx.branch.upsert({
+          where: { id: branch.id },
+          update: {
+            name: branch.name,
+            location: branch.location || null,
+            isActive: branch.isActive !== undefined ? branch.isActive : true,
+          },
+          create: {
+            id: branch.id,
+            businessId,
+            name: branch.name,
+            location: branch.location || null,
+            isActive: branch.isActive !== undefined ? branch.isActive : true,
+          },
+        });
+        syncedBranchIds.push(branch.id);
+      }
+
+      // Process Users
+      for (const user of users) {
+        await tx.user.upsert({
+          where: { id: user.id },
+          update: {
+            username: user.username,
+            role: user.role,
+            branchId: user.branchId || null,
+          },
+          create: {
+            id: user.id,
+            username: user.username,
+            password: user.password || 'default123',
+            role: user.role || 'CASHIER',
+            branchId: user.branchId || null,
+            businessId: user.businessId || businessId,
+          },
+        });
+        syncedUserIds.push(user.id);
+      }
+
       // Add Audit Log
       await tx.auditLog.create({
         data: {
@@ -471,6 +516,8 @@ export class SyncController {
             paymentsCount: payments.length,
             suppliersCount: suppliers.length,
             poCount: purchaseOrders.length,
+            branchesCount: branches.length,
+            usersCount: users.length,
           }),
         },
       });
@@ -483,6 +530,8 @@ export class SyncController {
         payments: syncedPaymentIds,
         suppliers: syncedSupplierIds,
         purchaseOrders: syncedPurchaseOrderIds,
+        branches: syncedBranchIds,
+        users: syncedUserIds,
       };
       });
     } catch (err: any) {
