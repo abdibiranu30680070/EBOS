@@ -118,7 +118,18 @@ export class SyncController {
 
   @Post('push')
   async push(@Request() req: any, @Body() body: any) {
-    const { businessId, branchId, sub: userId } = req.user;
+    const { businessId, sub: userId } = req.user;
+    let { branchId } = req.user;
+
+    // If branchId is missing from JWT, resolve it from the database
+    if (!branchId) {
+      const branch = await this.prisma.branch.findFirst({
+        where: { businessId },
+        orderBy: { createdAt: 'asc' },
+      });
+      branchId = branch?.id || null;
+    }
+
     const { 
       customers = [], 
       salesOrders = [], 
@@ -128,7 +139,9 @@ export class SyncController {
       purchaseOrders = []
     } = body;
 
-    const results = await this.prisma.$transaction(async (tx: any) => {
+    let results: any;
+    try {
+      results = await this.prisma.$transaction(async (tx: any) => {
       const syncedCustomerIds: string[] = [];
       const syncedOrderIds: string[] = [];
       const syncedMovementIds: string[] = [];
@@ -345,7 +358,11 @@ export class SyncController {
         suppliers: syncedSupplierIds,
         purchaseOrders: syncedPurchaseOrderIds,
       };
-    });
+      });
+    } catch (err: any) {
+      console.error('[SyncPush] Transaction failed:', err?.message || err);
+      throw err;
+    }
 
     return {
       success: true,
