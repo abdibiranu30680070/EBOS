@@ -124,12 +124,17 @@ async function _pushPendingChanges() {
     return;
   }
 
+  const formattedProducts = pendingProducts.map(p => ({
+    ...p,
+    isActive: p.isActive === 1 || p.isActive === true
+  }));
+
   console.log('[SyncEngine] Pushing local changes...');
   const response = await fetch(`${API_BASE_URL}/api/v1/sync/push`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({
-      products:           pendingProducts,
+      products:           formattedProducts,
       customers:          pendingCustomers,
       salesOrders:        ordersWithItems,
       payments:           pendingPayments,   // backend expects 'payments' not 'customerPayments'
@@ -189,7 +194,14 @@ async function _pullRemoteChanges() {
     async () => {
       // Products
       for (const p of changes.products || []) {
-        await db.products.put({ ...p, costPrice: Number(p.costPrice), sellingPrice: Number(p.sellingPrice), minStockLevel: Number(p.minStockLevel), syncStatus: 'SYNCED' });
+        await db.products.put({
+          ...p,
+          costPrice: Number(p.costPrice),
+          sellingPrice: Number(p.sellingPrice),
+          minStockLevel: Number(p.minStockLevel),
+          isActive: (p.isActive === true || p.isActive === 1) ? 1 : 0,
+          syncStatus: 'SYNCED'
+        });
       }
 
       // Customers
