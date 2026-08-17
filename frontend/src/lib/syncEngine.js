@@ -70,21 +70,35 @@ async function _pushPendingChanges() {
     })
   );
 
-  // Sync pending local users
+  // Sync pending local users — only push users that have a real password stored
+  // and use the real businessId/branchId from the JWT (not hardcoded placeholders)
   const pendingUsers = await db.users.where('syncStatus').equals('PENDING').toArray().catch(() => []);
   if (pendingUsers?.length) {
+    // Get the logged-in user's context from their decoded JWT
+    const rawToken = localStorage.getItem('ebos_token');
+    let jwtPayload = null;
+    try {
+      jwtPayload = JSON.parse(atob(rawToken.split('.')[1]));
+    } catch { /* ignore */ }
+
     for (const u of pendingUsers) {
+      // Skip if no real password is stored — cannot register without one
+      if (!u.password || u.password === 'default123') {
+        // Mark as SYNCED so we stop retrying with bad data
+        await db.users.update(u.id, { syncStatus: 'SYNCED' }).catch(() => {});
+        continue;
+      }
       try {
         const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({
             username: u.username,
-            password: u.password || 'default123',
-            fullName: u.username,
+            password: u.password,
+            fullName: u.fullName || u.username,
             role: u.role || 'CASHIER',
-            businessId: u.businessId || 'bus_mercato_001',
-            branchId: u.branchId || 'br_mercato_main',
+            businessId: u.businessId || jwtPayload?.businessId,
+            branchId: u.branchId || jwtPayload?.branchId || null,
           }),
         });
         if (res.ok || res.status === 400) {
@@ -118,7 +132,7 @@ async function _pushPendingChanges() {
       products:           pendingProducts,
       customers:          pendingCustomers,
       salesOrders:        ordersWithItems,
-      customerPayments:   pendingPayments,
+      payments:           pendingPayments,   // backend expects 'payments' not 'customerPayments'
       inventoryMovements: pendingMovements,
       suppliers:          pendingSuppliers,
       purchaseOrders:     posWithItems,
