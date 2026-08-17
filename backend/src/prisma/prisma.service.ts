@@ -1,6 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
@@ -9,13 +11,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   // This is a targeted, minimal workaround so controllers can use
   // `this.prisma.product`, `this.prisma.$transaction`, etc.
   [key: string]: any;
-  
+
   constructor() {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL environment variable is not set.');
+    // Use persistent storage path for Render deployment
+    const dbPath = process.env.DATABASE_URL || 'file:./dev.db';
+    const dbDir = path.dirname(dbPath.replace('file:', ''));
+
+    // Ensure database directory exists
+    if (dbDir && dbDir !== '.' && !fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
     }
-    const adapter = new PrismaPg({ connectionString });
+
+    const adapter = new PrismaBetterSqlite3({
+      url: dbPath,
+    });
     super({ adapter });
   }
 
