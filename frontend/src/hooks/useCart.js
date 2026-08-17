@@ -77,16 +77,38 @@ export function useCart({ user, customers }) {
 
   // ── Checkout ──────────────────────────────────
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (customLines) => {
     setCheckoutError('');
 
-    if (cart.length === 0) {
-      setCheckoutError('Cart is empty. Add a product before checking out.');
+    // Accept custom lines array or default cart
+    const itemsToProcess = customLines && customLines.length > 0 ? customLines : cart;
+
+    if (!itemsToProcess || itemsToProcess.length === 0) {
+      setCheckoutError('Order is empty. Add an order line before checking out.');
       return;
     }
 
+    // Format lines to ensure product and valid numeric properties
+    const formattedCart = itemsToProcess.map(item => {
+      if (item.product) return item;
+      // Resolve product object if passed as productId
+      return {
+        product: { id: item.productId, sellingPrice: Number(item.unitPrice) || 0, name: item.productName || 'Product' },
+        quantity: Number(item.quantity) || 1,
+        unitPrice: Number(item.unitPrice) || 0,
+      };
+    }).filter(item => item.product?.id && item.quantity > 0);
+
+    if (formattedCart.length === 0) {
+      setCheckoutError('Select at least one valid product order line.');
+      return;
+    }
+
+    const calculatedSubtotal = formattedCart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    const calculatedTotal    = Math.max(0, calculatedSubtotal - discountAmount);
+
     // Calculate unpaid credit amount
-    const unpaidCredit = Math.max(0, cartTotal - paidAmount);
+    const unpaidCredit = Math.max(0, calculatedTotal - paidAmount);
 
     // If there is an unpaid balance or paymentMode is CREDIT
     if (unpaidCredit > 0 || paymentMode === 'CREDIT') {
@@ -116,7 +138,7 @@ export function useCart({ user, customers }) {
         id: orderId, branchId,
         customerId:     selectedCustomerId || null,
         userId:         user?.id,
-        totalAmount:    cartTotal,
+        totalAmount:    calculatedTotal,
         discountAmount,
         paidAmount,
         paymentMode,
@@ -124,16 +146,16 @@ export function useCart({ user, customers }) {
         syncStatus:     'PENDING',
       };
 
-      const orderItems = cart.map(item => ({
+      const orderItems = formattedCart.map(item => ({
         id:         generateId('item'),
         orderId,
         productId:  item.product.id,
         quantity:   item.quantity,
-        unitPrice:  item.product.sellingPrice,
-        totalPrice: item.product.sellingPrice * item.quantity,
+        unitPrice:  item.unitPrice,
+        totalPrice: item.unitPrice * item.quantity,
       }));
 
-      const inventoryMvs = cart.map(item => ({
+      const inventoryMvs = formattedCart.map(item => ({
         id:            generateId('mv'),
         branchId,
         productId:     item.product.id,
@@ -164,11 +186,11 @@ export function useCart({ user, customers }) {
       const receiptOrder = {
         ...newOrder,
         customerName: selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : null,
-        items: cart.map(item => ({
+        items: formattedCart.map(item => ({
           name: item.product.name,
           productId: item.product.id,
           quantity: item.quantity,
-          totalPrice: item.product.sellingPrice * item.quantity,
+          totalPrice: item.unitPrice * item.quantity,
         })),
         businessName: user?.businessName,
         branchName: user?.branchName

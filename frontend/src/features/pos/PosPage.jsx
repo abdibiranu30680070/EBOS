@@ -12,10 +12,11 @@ import { CollectPaymentModal } from '../customers/CollectPaymentModal.jsx';
 import { ReceiptModal }        from './ReceiptModal.jsx';
 
 export function PosPage({ products, customers, stockBalances, cartHook, user }) {
-  const [showAddCustomer, setShowAddCustomer] = useState(false);
-  const [collectCustomer, setCollectCustomer] = useState(null);
-  const [lastOrder, setLastOrder]             = useState(null);
-  const [mobileCartOpen, setMobileCartOpen]   = useState(false);
+  const [showAddCustomer, setShowAddCustomer]               = useState(false);
+  const [collectCustomer, setCollectCustomer]               = useState(null);
+  const [selectedCatalogProduct, setSelectedCatalogProduct] = useState(null);
+  const [lastOrder, setLastOrder]                           = useState(null);
+  const [mobileCartOpen, setMobileCartOpen]                 = useState(false);
 
   const {
     cart, addToCart, updateCartQty, setCartQty,
@@ -33,8 +34,8 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
     setShowAddCustomer(false);
   };
 
-  const onCheckoutClick = async () => {
-    const order = await handleCheckout();
+  const onCheckoutClick = async (customLines) => {
+    const order = await handleCheckout(customLines);
     if (order) {
       setLastOrder(order);
       setMobileCartOpen(false);
@@ -56,7 +57,7 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
             <ProductCatalog
               products={products}
               stockBalances={stockBalances}
-              onAddToCart={addToCart}
+              onSelectProduct={(prod) => setSelectedCatalogProduct(prod)}
             />
           </div>
         </div>
@@ -67,7 +68,7 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
             onClick={() => setMobileCartOpen(true)}
             className="w-full bg-blue-600 text-white font-bold text-lg py-4 rounded-2xl shadow-xl flex items-center justify-between px-6 active:scale-95 transition-transform"
           >
-            <span className="flex items-center gap-2">🛒 View Cart</span>
+            <span className="flex items-center gap-2">🛒 View Order Lines</span>
             <div className="flex items-center gap-2">
               <span className="bg-white/20 px-2 py-0.5 rounded-full text-sm">{totalItems}</span>
               <span>ETB {cartTotal.toLocaleString()}</span>
@@ -75,7 +76,7 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
           </button>
         </div>
 
-        {/* Right — Cart terminal (Fixed overlay on mobile, static col on desktop) */}
+        {/* Right — Cart terminal (Odoo Order Lines Table) */}
         <div className={`
           fixed inset-0 z-30 bg-white lg:static lg:bg-transparent lg:block transition-transform duration-300
           ${mobileCartOpen ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
@@ -84,14 +85,13 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
             {/* Mobile close button */}
             <button 
               onClick={() => setMobileCartOpen(false)}
-              className="lg:hidden absolute top-4 left-4 p-2 bg-slate-100 rounded-full text-slate-600"
+              className="lg:hidden absolute top-4 left-4 p-2 bg-slate-100 rounded-full text-slate-600 font-bold"
             >
-              ↓ Close Cart
+              ↓ Close Order Lines
             </button>
             
             <CartTerminal
               products={products}
-              cart={cart}
               customers={customers}
               selectedCustomerId={selectedCustomerId}
               setSelectedCustomerId={setSelectedCustomerId}
@@ -101,15 +101,12 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
               setPaidAmount={setPaidAmount}
               paymentMode={paymentMode}
               setPaymentMode={setPaymentMode}
-              cartSubtotal={cartSubtotal}
-              cartTotal={cartTotal}
               checkoutError={checkoutError}
-              onAddToCart={addToCart}
-              onUpdateQty={updateCartQty}
-              onSetQty={setCartQty}
               onCheckout={onCheckoutClick}
               onShowAddCustomer={() => setShowAddCustomer(true)}
               onShowCollectPayment={(customer) => setCollectCustomer(customer)}
+              selectedCatalogProduct={selectedCatalogProduct}
+              onClearCatalogSelection={() => setSelectedCatalogProduct(null)}
             />
           </div>
         </div>
