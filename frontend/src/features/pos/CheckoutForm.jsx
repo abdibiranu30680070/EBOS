@@ -16,8 +16,11 @@ export function CheckoutForm({
   checkoutError,
   onCheckout,
   onShowAddCustomer,
+  onShowCollectPayment,
   cartEmpty,
 }) {
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+
   return (
     <div className="flex flex-col h-full">
       {/* ── Payment fields ─────────────────────── */}
@@ -45,10 +48,22 @@ export function CheckoutForm({
                 </option>
               ))}
             </select>
+
+            {selectedCustomer && selectedCustomer.outstandingBalance > 0 && (
+              <button
+                type="button"
+                onClick={() => onShowCollectPayment(selectedCustomer)}
+                className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-xl cursor-pointer transition-colors shadow-xs"
+                title="Pay customer credit / collect debt"
+              >
+                💰 Pay Credit
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onShowAddCustomer}
-              className="shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors"
+              className="shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3 py-2 rounded-xl cursor-pointer transition-colors"
               title="Add new customer"
             >
               + New
@@ -94,30 +109,50 @@ export function CheckoutForm({
 
         {/* Amount paid */}
         <div className="flex justify-between items-center text-sm text-slate-500">
-          <span>Amount Paid</span>
+          <span>Amount Paid (ETB)</span>
           <input
             id="pos-paid-amount"
             type="number"
             min="0"
-            disabled={paymentMode === 'CREDIT'}
-            className={`${inputClass} w-24 text-right py-1.5 disabled:bg-slate-100 disabled:text-slate-400`}
+            step="any"
+            className={`${inputClass} w-28 text-right py-1.5 font-bold text-slate-800`}
             value={paidAmount}
             onChange={e => setPaidAmount(Number(e.target.value))}
+            onClick={e => e.target.select()}
           />
         </div>
 
         {/* Grand total */}
         <div className="flex justify-between items-baseline font-extrabold text-slate-900 text-lg border-t border-dashed border-slate-200 pt-3">
-          <span>Total</span>
+          <span>Total Amount</span>
           <span>ETB {cartTotal.toLocaleString()}</span>
         </div>
 
-        {/* Credit indicator */}
-        {paymentMode === 'CREDIT' && (
-          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            🔸 Credit sale — ETB {(cartTotal - paidAmount).toLocaleString()} will be added to customer balance
+        {/* Partial payment & Credit indicators */}
+        {cartTotal - paidAmount > 0 ? (
+          <div className={`text-xs p-3 rounded-xl border ${
+            selectedCustomerId
+              ? 'bg-amber-50 text-amber-800 border-amber-200'
+              : 'bg-rose-50 text-rose-800 border-rose-200'
+          }`}>
+            {selectedCustomerId ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-bold">🔸 Credit Remaining:</span> ETB {(cartTotal - paidAmount).toLocaleString()}
+                  <p className="text-[11px] text-amber-700 mt-0.5">Will be added to selected customer's credit balance.</p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <span className="font-bold">⚠️ Customer Required:</span> Paying less than total (ETB {(cartTotal - paidAmount).toLocaleString()} remaining) requires selecting a Customer account to save as credit.
+              </div>
+            )}
           </div>
-        )}
+        ) : paymentMode === 'CREDIT' ? (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+            🔸 Full Credit Sale — ETB {cartTotal.toLocaleString()} will be added to customer credit balance.
+          </div>
+        ) : null}
 
         {/* Checkout button */}
         <button

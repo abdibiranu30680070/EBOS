@@ -4,15 +4,16 @@
 // Props: products, customers, stockBalances, cartHook
 // ─────────────────────────────────────────────
 
-import { useState }          from 'react';
-import { ProductCatalog }    from './ProductCatalog.jsx';
+import { useState }            from 'react';
+import { ProductCatalog }      from './ProductCatalog.jsx';
 import { CartTerminal }      from './CartTerminal.jsx';
-import { AddCustomerModal }  from '../customers/AddCustomerModal.jsx';
-
-import { ReceiptModal }      from './ReceiptModal.jsx';
+import { AddCustomerModal }    from '../customers/AddCustomerModal.jsx';
+import { CollectPaymentModal } from '../customers/CollectPaymentModal.jsx';
+import { ReceiptModal }        from './ReceiptModal.jsx';
 
 export function PosPage({ products, customers, stockBalances, cartHook, user }) {
   const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [collectCustomer, setCollectCustomer] = useState(null);
   const [lastOrder, setLastOrder]             = useState(null);
   const [mobileCartOpen, setMobileCartOpen]   = useState(false);
 
@@ -108,6 +109,7 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
               onSetQty={setCartQty}
               onCheckout={onCheckoutClick}
               onShowAddCustomer={() => setShowAddCustomer(true)}
+              onShowCollectPayment={(customer) => setCollectCustomer(customer)}
             />
           </div>
         </div>
@@ -119,6 +121,14 @@ export function PosPage({ products, customers, stockBalances, cartHook, user }) 
         onClose={() => setShowAddCustomer(false)}
         user={user}
         onSuccess={handleCustomerAdded}
+      />
+
+      {/* Collect payment modal for quick debt repayment */}
+      <CollectPaymentModal
+        isOpen={!!collectCustomer}
+        onClose={() => setCollectCustomer(null)}
+        customer={collectCustomer}
+        user={user}
       />
 
       {/* Receipt modal */}

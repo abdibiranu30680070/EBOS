@@ -85,20 +85,22 @@ export function useCart({ user, customers }) {
       return;
     }
 
-    // Credit validation
-    if (paymentMode === 'CREDIT') {
+    // Calculate unpaid credit amount
+    const unpaidCredit = Math.max(0, cartTotal - paidAmount);
+
+    // If there is an unpaid balance or paymentMode is CREDIT
+    if (unpaidCredit > 0 || paymentMode === 'CREDIT') {
       if (!selectedCustomerId) {
-        setCheckoutError('Select a customer account for credit sales.');
+        setCheckoutError(`Unpaid balance of ETB ${unpaidCredit.toLocaleString()} requires selecting a customer account to save as credit.`);
         return;
       }
       const customer = customers.find(c => c.id === selectedCustomerId);
       if (customer) {
-        const creditAmount       = cartTotal - paidAmount;
-        const projectedBalance   = customer.outstandingBalance + creditAmount;
+        const projectedBalance = customer.outstandingBalance + unpaidCredit;
         if (projectedBalance > customer.creditLimit) {
           setCheckoutError(
-            `Credit limit exceeded! Limit: ETB ${customer.creditLimit.toLocaleString()}, ` +
-            `projected debt: ETB ${projectedBalance.toLocaleString()}.`
+            `Credit limit exceeded for ${customer.name}! Limit: ETB ${customer.creditLimit.toLocaleString()}, ` +
+            `current debt: ETB ${customer.outstandingBalance.toLocaleString()}, projected debt: ETB ${projectedBalance.toLocaleString()}.`
           );
           return;
         }
@@ -147,17 +149,14 @@ export function useCart({ user, customers }) {
         await db.salesOrderItems.bulkAdd(orderItems);
         await db.inventoryMovements.bulkAdd(inventoryMvs);
 
-        // Adjust local credit balance
-        if (paymentMode === 'CREDIT' && selectedCustomerId) {
-          const creditDelta = cartTotal - paidAmount;
-          if (creditDelta > 0) {
-            const cust = await db.customers.get(selectedCustomerId);
-            if (cust) {
-              await db.customers.update(selectedCustomerId, {
-                outstandingBalance: cust.outstandingBalance + creditDelta,
-                syncStatus: 'PENDING',
-              });
-            }
+        // Adjust customer outstanding credit balance if there is an unpaid portion
+        if (selectedCustomerId && unpaidCredit > 0) {
+          const cust = await db.customers.get(selectedCustomerId);
+          if (cust) {
+            await db.customers.update(selectedCustomerId, {
+              outstandingBalance: cust.outstandingBalance + unpaidCredit,
+              syncStatus: 'PENDING',
+            });
           }
         }
       });

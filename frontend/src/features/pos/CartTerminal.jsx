@@ -18,6 +18,7 @@ export function CartTerminal({
   onSetQty,
   onCheckout,
   onShowAddCustomer,
+  onShowCollectPayment,
 }) {
   const [quickQty, setQuickQty] = useState(1);
 
@@ -106,6 +107,7 @@ export function CartTerminal({
         checkoutError={checkoutError}
         onCheckout={onCheckout}
         onShowAddCustomer={onShowAddCustomer}
+        onShowCollectPayment={onShowCollectPayment}
         cartEmpty={cart.length === 0}
       />
     </div>
