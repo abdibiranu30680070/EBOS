@@ -6,16 +6,10 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error(
-    "[EBOS] DATABASE_URL is not set.\n" +
-    "  → Create a '.env' file in the backend directory\n" +
-    "  → Add: DATABASE_URL=\"postgresql://USER:PASSWORD@HOST:5432/DATABASE\"\n" +
-    "  → See '.env.example' for reference."
-  );
-}
+// Use a placeholder during `prisma generate` (build phase).
+// The real DATABASE_URL is injected by Render at runtime.
+// The actual DB connection is made via PrismaPg adapter in PrismaService.
+const databaseUrl = process.env.DATABASE_URL || "postgresql://placeholder:placeholder@localhost:5432/placeholder";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
