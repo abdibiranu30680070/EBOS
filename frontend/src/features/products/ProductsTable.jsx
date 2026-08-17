@@ -1,15 +1,15 @@
 // ─────────────────────────────────────────────
 // ProductsTable — All products with management
-// Props: products, stockBalances, onAdd, onToggleActive
+// Props: products, stockBalances, onAdd, onEdit, onDelete
 // ─────────────────────────────────────────────
 
-import { useState }   from 'react';
-import { db }         from '../../lib/db.js';
-import { SyncBadge }  from '../../components/ui/Badge.jsx';
+import { useState } from 'react';
+import { db } from '../../lib/db.js';
+import { syncNow } from '../../lib/syncEngine.js';
 
 const HEADERS = ['SKU', 'Product Name', 'Unit', 'Cost', 'Price', 'Margin', 'Min Stock', 'Balance', 'Status'];
 
-export function ProductsTable({ products, stockBalances, onAdd }) {
+export function ProductsTable({ products, stockBalances, onAdd, onEdit, onDelete }) {
   const [search, setSearch] = useState('');
 
   const filtered = products.filter(p =>
@@ -18,12 +18,13 @@ export function ProductsTable({ products, stockBalances, onAdd }) {
   );
 
   const handleToggle = async (product) => {
-    await db.products.update(product.id, { isActive: product.isActive === 1 ? 0 : 1 });
+    const nextState = product.isActive === 1 || product.isActive === true ? 0 : 1;
+    await db.products.update(product.id, { isActive: nextState, syncStatus: 'PENDING' });
+    await syncNow();
   };
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      {/* Header row */}
       <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-4">
         <div className="flex-1">
           <h3 className="font-bold text-slate-800">Product Catalogue</h3>
@@ -59,17 +60,17 @@ export function ProductsTable({ products, stockBalances, onAdd }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={HEADERS.length + 1} className="py-12 text-center text-slate-400 text-sm">
+                <td colSpan={HEADERS.length + 2} className="py-12 text-center text-slate-400 text-sm">
                   {search ? `No products match "${search}"` : 'No products yet. Add your first product →'}
                 </td>
               </tr>
             ) : filtered.map(p => {
               const balance = stockBalances[p.id] || 0;
-              const isLow   = balance < p.minStockLevel;
-              const margin  = p.costPrice > 0
+              const isLow = balance < p.minStockLevel;
+              const margin = p.costPrice > 0
                 ? Math.round(((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100)
                 : null;
-              const inactive = p.isActive !== 1;
+              const inactive = p.isActive !== 1 && p.isActive !== true;
 
               return (
                 <tr key={p.id} className={`border-b border-slate-100 transition-colors ${inactive ? 'opacity-50 bg-slate-50' : 'hover:bg-slate-50/50'}`}>
@@ -97,12 +98,26 @@ export function ProductsTable({ products, stockBalances, onAdd }) {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    <button
-                      onClick={() => handleToggle(p)}
-                      className="text-xs text-slate-400 hover:text-slate-700 cursor-pointer transition-colors underline underline-offset-2"
-                    >
-                      {inactive ? 'Activate' : 'Deactivate'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onEdit?.(p)}
+                        className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer transition-colors underline underline-offset-2"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => onDelete?.(p)}
+                        className="text-xs text-rose-600 hover:text-rose-800 cursor-pointer transition-colors underline underline-offset-2"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => handleToggle(p)}
+                        className="text-xs text-slate-400 hover:text-slate-700 cursor-pointer transition-colors underline underline-offset-2"
+                      >
+                        {inactive ? 'Activate' : 'Deactivate'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -11,7 +11,7 @@ export class ProductsController {
   async getProducts(@Request() req: any) {
     const { businessId } = req.user;
     return this.prisma.product.findMany({
-      where: { businessId, isActive: true },
+      where: { businessId },
       orderBy: { name: 'asc' },
     });
   }
@@ -44,5 +44,42 @@ export class ProductsController {
         isActive: isActive !== undefined ? isActive : true,
       },
     });
+  }
+
+  @Put(':id')
+  async updateProduct(@Request() req: any, @Param('id') id: string, @Body() body: any) {
+    const { businessId } = req.user;
+    const { sku, name, costPrice, sellingPrice, minStockLevel, unitOfMeasure, isActive } = body;
+
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        sku,
+        name,
+        costPrice,
+        sellingPrice,
+        minStockLevel: minStockLevel || 0,
+        unitOfMeasure: unitOfMeasure || 'Pcs',
+        isActive: isActive !== undefined ? isActive : true,
+        businessId,
+      },
+    });
+  }
+
+  @Delete(':id')
+  async deleteProduct(@Request() req: any, @Param('id') id: string) {
+    const { businessId } = req.user;
+
+    const existing = await this.prisma.product.findFirst({ where: { id, businessId } });
+    if (!existing) {
+      return { deleted: false, id };
+    }
+
+    await this.prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    return { deleted: true, id };
   }
 }

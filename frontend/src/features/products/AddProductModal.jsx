@@ -1,63 +1,91 @@
 // ─────────────────────────────────────────────
-// AddProductModal — Create a new product locally
-// Props: isOpen, onClose, user, onSuccess
+// AddProductModal — Create or update a product locally
+// Props: isOpen, onClose, user, onSuccess, product
 // ─────────────────────────────────────────────
 
-import { useState }    from 'react';
-import { Modal }       from '../../components/ui/Modal.jsx';
+import { useEffect, useState } from 'react';
+import { Modal } from '../../components/ui/Modal.jsx';
 import { FormField, inputClass, selectClass } from '../../components/ui/FormField.jsx';
-import { db }          from '../../lib/db.js';
-import { generateId }  from '../../lib/generateId.js';
-import { syncNow }     from '../../lib/syncEngine.js';
+import { db } from '../../lib/db.js';
+import { generateId } from '../../lib/generateId.js';
+import { syncNow } from '../../lib/syncEngine.js';
 import { UNIT_OF_MEASURES, DEFAULT_BUSINESS_ID } from '../../lib/constants.js';
 
-export function AddProductModal({ isOpen, onClose, user, onSuccess }) {
-  const [form, setForm] = useState({
-    sku: '', name: '', costPrice: '', sellingPrice: '',
-    minStockLevel: 5, unitOfMeasure: 'pcs',
-  });
-  const [error,  setError]  = useState('');
+const emptyForm = {
+  sku: '', name: '', costPrice: '', sellingPrice: '',
+  minStockLevel: 5, unitOfMeasure: 'pcs',
+};
+
+export function AddProductModal({ isOpen, onClose, user, onSuccess, product = null }) {
+  const [form, setForm] = useState(emptyForm);
+  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (product) {
+      setForm({
+        sku: product.sku || '',
+        name: product.name || '',
+        costPrice: String(product.costPrice ?? ''),
+        sellingPrice: String(product.sellingPrice ?? ''),
+        minStockLevel: Number(product.minStockLevel ?? 0),
+        unitOfMeasure: product.unitOfMeasure || 'pcs',
+      });
+    } else {
+      setForm(emptyForm);
+    }
+    setError('');
+  }, [isOpen, product]);
 
   const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
-  const reset = () => {
-    setForm({ sku: '', name: '', costPrice: '', sellingPrice: '', minStockLevel: 5, unitOfMeasure: 'pcs' });
+  const handleClose = () => {
+    setForm(emptyForm);
     setError('');
+    onClose();
   };
-
-  const handleClose = () => { reset(); onClose(); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!form.name.trim())    { setError('Product name is required.'); return; }
+    if (!form.name.trim()) {
+      setError('Product name is required.');
+      return;
+    }
     if (!form.sellingPrice || Number(form.sellingPrice) <= 0) {
-      setError('Selling price must be greater than zero.'); return;
+      setError('Selling price must be greater than zero.');
+      return;
     }
 
     setSaving(true);
     try {
-      const id = generateId('prod');
+      const id = product?.id || generateId('prod');
       const autoSku = form.sku.trim() || `SKU-${id.substring(5, 11).toUpperCase()}`;
-
-      await db.products.add({
+      const payload = {
         id,
-        businessId:     user?.businessId || DEFAULT_BUSINESS_ID,
-        sku:            autoSku,
-        name:           form.name.trim(),
-        costPrice:      Number(form.costPrice) || 0,
-        sellingPrice:   Number(form.sellingPrice),
-        minStockLevel:  Number(form.minStockLevel) || 0,
-        unitOfMeasure:  form.unitOfMeasure,
-        isActive:       1,
-        syncStatus:     'PENDING',
-      });
+        businessId: user?.businessId || DEFAULT_BUSINESS_ID,
+        sku: autoSku,
+        name: form.name.trim(),
+        costPrice: Number(form.costPrice) || 0,
+        sellingPrice: Number(form.sellingPrice),
+        minStockLevel: Number(form.minStockLevel) || 0,
+        unitOfMeasure: form.unitOfMeasure,
+        isActive: product ? (product.isActive === 1 || product.isActive === true ? 1 : 0) : 1,
+        syncStatus: 'PENDING',
+      };
 
-      syncNow();
-      reset();
-      onSuccess?.(id);
+      if (product) {
+        await db.products.update(product.id, payload);
+      } else {
+        await db.products.add(payload);
+      }
+
+      await syncNow();
+      handleClose();
+      onSuccess?.(payload);
     } catch (err) {
       setError(`Could not save product: ${err.message}`);
     } finally {
@@ -66,7 +94,7 @@ export function AddProductModal({ isOpen, onClose, user, onSuccess }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add New Product" size="md">
+    <Modal isOpen={isOpen} onClose={handleClose} title={product ? 'Edit Product' : 'Add New Product'} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">{error}</div>
@@ -113,7 +141,7 @@ export function AddProductModal({ isOpen, onClose, user, onSuccess }) {
           </button>
           <button type="submit" disabled={saving}
             className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-sm py-2.5 rounded-xl cursor-pointer transition-colors">
-            {saving ? 'Saving…' : '🏷️ Save Product'}
+            {saving ? 'Saving…' : product ? '💾 Update Product' : '🏷️ Save Product'}
           </button>
         </div>
       </form>
