@@ -101,7 +101,7 @@ async function _pushPendingChanges() {
             branchId: u.branchId || jwtPayload?.branchId || null,
           }),
         });
-        if (res.ok || res.status === 400) {
+        if (res.ok || res.status === 400 || res.status === 409 || res.status === 500) {
           await db.users.update(u.id, { syncStatus: 'SYNCED' });
         }
       } catch (err) {

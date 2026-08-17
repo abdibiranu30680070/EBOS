@@ -45,5 +45,7 @@ export async function clearDatabaseData() {
     db.purchaseOrders.clear(),
     db.purchaseOrderItems.clear(),
     db.syncMetadata.clear(),
+    db.users.clear(),
+    db.branches.clear(),
   ]);
 }
