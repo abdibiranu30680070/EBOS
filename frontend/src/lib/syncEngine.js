@@ -151,9 +151,13 @@ async function _pushPendingChanges() {
 
   const { customers: sc, salesOrders: so, inventoryMovements: sm, payments: sp, suppliers: ss, purchaseOrders: spo } = result.synced;
 
-  // Mark pushed records as SYNCED in a single transaction
+  const failedItems = result.failed || [];
+  if (failedItems.length) {
+    console.warn('[SyncEngine] Some records were rejected by the server:', failedItems);
+  }
+
   await db.transaction('rw', [
-    db.products, db.customers, db.salesOrders, db.customerPayments, 
+    db.products, db.customers, db.salesOrders, db.customerPayments,
     db.inventoryMovements, db.suppliers, db.purchaseOrders
   ], async () => {
     if (result.synced.products?.length) await Promise.all(result.synced.products.map(id => db.products.update(id, { syncStatus: 'SYNCED' })));
@@ -163,6 +167,16 @@ async function _pushPendingChanges() {
     if (sm?.length) await Promise.all(sm.map(id => db.inventoryMovements.update(id, { syncStatus: 'SYNCED' })));
     if (ss?.length) await Promise.all(ss.map(id => db.suppliers.update(id, { syncStatus: 'SYNCED' })));
     if (spo?.length) await Promise.all(spo.map(id => db.purchaseOrders.update(id, { syncStatus: 'SYNCED' })));
+
+    if (failedItems.length) {
+      await Promise.all(failedItems.map(({ id, type }) => {
+        if (type === 'product') return db.products.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+        if (type === 'customer') return db.customers.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+        if (type === 'supplier') return db.suppliers.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+        if (type === 'inventory') return db.inventoryMovements.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+        return Promise.resolve();
+      }));
+    }
   });
 
   console.log('[SyncEngine] Push complete.');

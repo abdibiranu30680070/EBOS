@@ -124,6 +124,15 @@ export interface LocalPurchaseOrder {
   items?: LocalPurchaseOrderItem[];
 }
 
+export interface LocalPurchaseOrderSyncPayload {
+  id: string;
+  branchId: string;
+  supplierId: string;
+  totalAmount: number;
+  createdAt: string;
+  items: LocalPurchaseOrderItem[];
+}
+
 export interface SyncMetadata {
   key: string;
   value: string;
