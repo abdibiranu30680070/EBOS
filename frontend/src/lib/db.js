@@ -11,7 +11,7 @@ class EbosDatabase extends Dexie {
     super('EbosDatabase');
 
     this.version(1).stores({
-      products: 'id, businessId, sku, name, isActive',
+      products: 'id, businessId, sku, name, isActive, syncStatus',
       customers: 'id, businessId, name, syncStatus',
       inventoryMovements: 'id, branchId, productId, syncStatus, createdAt',
       salesOrders: 'id, branchId, customerId, syncStatus, createdAt',

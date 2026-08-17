@@ -11,6 +11,7 @@ export interface LocalProduct {
   minStockLevel: number;
   unitOfMeasure: string;
   isActive: boolean;
+  syncStatus?: 'PENDING' | 'SYNCED' | 'FAILED';
 }
 
 export interface LocalCustomer {
@@ -90,6 +91,39 @@ export interface LocalUser {
   syncStatus?: 'PENDING' | 'SYNCED' | 'FAILED';
 }
 
+export interface LocalSupplier {
+  id: string;
+  businessId: string;
+  name: string;
+  phone?: string;
+  contactPerson?: string;
+  email?: string;
+  address?: string;
+  isActive?: boolean;
+  syncStatus?: 'PENDING' | 'SYNCED' | 'FAILED';
+}
+
+export interface LocalPurchaseOrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface LocalPurchaseOrder {
+  id: string;
+  branchId: string;
+  supplierId: string;
+  userId?: string;
+  totalAmount: number;
+  status?: string;
+  createdAt: string;
+  syncStatus: 'PENDING' | 'SYNCED' | 'FAILED';
+  items?: LocalPurchaseOrderItem[];
+}
+
 export interface SyncMetadata {
   key: string;
   value: string;
@@ -104,6 +138,9 @@ class EbosDatabase extends Dexie {
   customerPayments!: Table<LocalCustomerPayment>;
   branches!: Table<LocalBranch>;
   users!: Table<LocalUser>;
+  suppliers!: Table<LocalSupplier>;
+  purchaseOrders!: Table<LocalPurchaseOrder>;
+  purchaseOrderItems!: Table<LocalPurchaseOrderItem>;
   syncMetadata!: Table<SyncMetadata>;
 
   constructor() {
@@ -121,6 +158,9 @@ class EbosDatabase extends Dexie {
 
     this.version(2).stores({
       users: 'id, branchId, role, syncStatus',
+      suppliers: 'id, businessId, name, syncStatus',
+      purchaseOrders: 'id, branchId, supplierId, syncStatus, createdAt',
+      purchaseOrderItems: 'id, orderId, productId',
     });
   }
 }
