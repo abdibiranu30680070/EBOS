@@ -8,13 +8,15 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export async function syncNow(): Promise<{ success: boolean; message: string }> {
-  if (!navigator.onLine) {
-    return { success: false, message: 'Device is offline' };
-  }
-
   const token = localStorage.getItem('ebos_token');
   if (!token) {
     return { success: false, message: 'User is not logged in' };
+  }
+
+  // If offline, skip sync but don't fail - operations are already queued locally
+  if (!navigator.onLine) {
+    console.log('Device offline - skipping sync, data is queued locally');
+    return { success: true, message: 'Offline - data queued for later sync' };
   }
 
   try {
@@ -87,7 +89,7 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
         body: JSON.stringify({
           customers: pendingCustomers,
           salesOrders: ordersWithItems,
-          customerPayments: pendingPayments,
+          payments: pendingPayments,
           inventoryMovements: pendingMovements
         })
       });
@@ -97,8 +99,10 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
       }
 
       const pushResult = await pushResponse.json();
+      console.log('Push response:', pushResult);
       if (pushResult.success && pushResult.synced) {
         const { customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts } = pushResult.synced;
+        console.log('Synced IDs:', { syncedCusts, syncedOrders, syncedMvs, syncedPmts });
 
         // Mark pushed records as SYNCED
         await db.transaction('rw', [db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements], async () => {
@@ -116,6 +120,8 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
           }
         });
         console.log('Successfully pushed local changes.');
+      } else {
+        console.error('Push failed or no synced data returned:', pushResult);
       }
     }
 
