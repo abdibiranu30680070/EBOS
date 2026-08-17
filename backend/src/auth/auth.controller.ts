@@ -1,9 +1,43 @@
-import { Controller, Post, Body, UnauthorizedException, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, UnauthorizedException, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('api/v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Get('users')
+  async getUsers(@Query('businessId') businessId?: string, @Query('branchId') branchId?: string) {
+    if (!businessId) {
+      return [];
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        businessId,
+        ...(branchId ? { branchId } : {}),
+      },
+      orderBy: { username: 'asc' },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        businessId: true,
+        branchId: true,
+        fullName: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    return users.map((user) => ({
+      ...user,
+      syncStatus: 'SYNCED',
+    }));
+  }
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)

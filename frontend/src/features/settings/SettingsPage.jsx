@@ -2,9 +2,10 @@
 // SettingsPage — Configuration, User & Branch Management
 // ─────────────────────────────────────────────
 
-import { useState }                from 'react';
+import { useEffect, useState }     from 'react';
 import { useLiveQuery }            from 'dexie-react-hooks';
 import { db }                      from '../../lib/db.js';
+import { API_BASE_URL }            from '../../lib/constants.js';
 import { UserManagementTable }     from './UserManagementTable.jsx';
 import { AddUserModal }            from './AddUserModal.jsx';
 import { BranchManagementTable }   from './BranchManagementTable.jsx';
@@ -15,7 +16,11 @@ export function SettingsPage({ currentUser }) {
   const [showAddUser, setShowAddUser]   = useState(false);
   const [showAddBranch, setShowAddBranch] = useState(false);
 
-  const users    = useLiveQuery(() => db.users.toArray()) || [];
+  const users = useLiveQuery(
+    () => db.users.where('businessId').equals(currentUser?.businessId || '').toArray(),
+    [currentUser?.businessId]
+  ) || [];
+
   const branches = useLiveQuery(() => db.branches.toArray()) || [
     {
       id: 'br_mercato_main',
@@ -25,6 +30,45 @@ export function SettingsPage({ currentUser }) {
       isActive: true,
     }
   ];
+
+  useEffect(() => {
+    if (!currentUser?.businessId) return;
+
+    const loadUsers = async () => {
+      try {
+        const token = localStorage.getItem('ebos_token');
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/users?businessId=${encodeURIComponent(currentUser.businessId)}` , {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) return;
+
+        const remoteUsers = await res.json();
+        if (!Array.isArray(remoteUsers)) return;
+
+        await db.transaction('rw', [db.users], async () => {
+          for (const user of remoteUsers) {
+            await db.users.put({
+              id: user.id,
+              username: user.username,
+              role: user.role,
+              businessId: user.businessId,
+              branchId: user.branchId || null,
+              fullName: user.fullName || user.username,
+              isActive: user.isActive,
+              syncStatus: 'SYNCED',
+            });
+          }
+        });
+      } catch (err) {
+        console.warn('[SettingsPage] Failed to load users:', err);
+      }
+    };
+
+    loadUsers();
+  }, [currentUser?.businessId]);
 
   const isOwner = currentUser?.role === 'OWNER' || true; // Owner default for config access
 
