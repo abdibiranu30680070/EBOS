@@ -208,6 +208,20 @@ export class SyncController {
         });
 
         if (!existingPo) {
+          // Auto-resolve missing supplier to prevent foreign key errors
+          if (po.supplierId) {
+            const supplierExists = await tx.supplier.findUnique({ where: { id: po.supplierId } });
+            if (!supplierExists) {
+              await tx.supplier.create({
+                data: {
+                  id: po.supplierId,
+                  businessId,
+                  name: 'Imported Vendor (' + po.supplierId.substring(0, 8) + ')',
+                }
+              });
+            }
+          }
+
           await tx.purchaseOrder.create({
             data: {
               id: po.id,
@@ -218,6 +232,22 @@ export class SyncController {
           });
 
           for (const item of po.items || []) {
+            if (item.productId) {
+              const productExists = await tx.product.findUnique({ where: { id: item.productId } });
+              if (!productExists) {
+                await tx.product.create({
+                  data: {
+                    id: item.productId,
+                    businessId,
+                    sku: 'UNSYNCED_' + item.productId.substring(0, 8),
+                    name: 'Imported Product (' + item.productId.substring(0, 8) + ')',
+                    costPrice: 0,
+                    sellingPrice: 0,
+                  }
+                });
+              }
+            }
+
             await tx.purchaseOrderItem.create({
               data: {
                 id: item.id,
@@ -260,6 +290,22 @@ export class SyncController {
         });
 
         if (!existingOrder) {
+          // Auto-resolve missing customer to prevent foreign key errors
+          if (order.customerId) {
+            const customerExists = await tx.customer.findUnique({ where: { id: order.customerId } });
+            if (!customerExists) {
+              await tx.customer.create({
+                data: {
+                  id: order.customerId,
+                  businessId,
+                  name: 'Imported Customer (' + order.customerId.substring(0, 8) + ')',
+                  creditLimit: 0,
+                  outstandingBalance: 0,
+                }
+              });
+            }
+          }
+
           // Create new order
           await tx.salesOrder.create({
             data: {
@@ -277,6 +323,22 @@ export class SyncController {
 
           // Create order items
           for (const item of order.items || []) {
+            if (item.productId) {
+              const productExists = await tx.product.findUnique({ where: { id: item.productId } });
+              if (!productExists) {
+                await tx.product.create({
+                  data: {
+                    id: item.productId,
+                    businessId,
+                    sku: 'UNSYNCED_' + item.productId.substring(0, 8),
+                    name: 'Imported Product (' + item.productId.substring(0, 8) + ')',
+                    costPrice: 0,
+                    sellingPrice: 0,
+                  }
+                });
+              }
+            }
+
             await tx.salesOrderItem.create({
               data: {
                 id: item.id,
@@ -314,6 +376,22 @@ export class SyncController {
         });
 
         if (!existingPayment) {
+          // Auto-resolve missing customer to prevent foreign key errors
+          if (payment.customerId) {
+            const customerExists = await tx.customer.findUnique({ where: { id: payment.customerId } });
+            if (!customerExists) {
+              await tx.customer.create({
+                data: {
+                  id: payment.customerId,
+                  businessId,
+                  name: 'Imported Customer (' + payment.customerId.substring(0, 8) + ')',
+                  creditLimit: 0,
+                  outstandingBalance: 0,
+                }
+              });
+            }
+          }
+
           await tx.customerPayment.create({
             data: {
               id: payment.id,
@@ -347,6 +425,22 @@ export class SyncController {
         });
 
         if (!existingMovement) {
+          if (movement.productId) {
+            const productExists = await tx.product.findUnique({ where: { id: movement.productId } });
+            if (!productExists) {
+              await tx.product.create({
+                data: {
+                  id: movement.productId,
+                  businessId,
+                  sku: 'UNSYNCED_' + movement.productId.substring(0, 8),
+                  name: 'Imported Product (' + movement.productId.substring(0, 8) + ')',
+                  costPrice: 0,
+                  sellingPrice: 0,
+                }
+              });
+            }
+          }
+
           await tx.inventoryMovement.create({
             data: {
               id: movement.id,
