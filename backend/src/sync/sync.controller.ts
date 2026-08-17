@@ -278,21 +278,18 @@ export class SyncController {
 
         // Process Customers
         for (const customer of customers) {
-          await tx.customer.upsert({
+          const existingCustomer = await tx.customer.findUnique({ where: { id: customer.id } });
+          if (!existingCustomer) {
+            pushFailure(customer.id, 'customer', 'CUSTOMER_NOT_FOUND', `Customer ${customer.id} must exist before syncing a customer record.`);
+            continue;
+          }
+
+          await tx.customer.update({
             where: { id: customer.id },
-            update: {
+            data: {
               name: customer.name,
               phone: customer.phone,
               creditLimit: customer.creditLimit,
-              outstandingBalance: customer.outstandingBalance,
-            },
-            create: {
-              id: customer.id,
-              businessId,
-              name: customer.name,
-              phone: customer.phone,
-              creditLimit: customer.creditLimit,
-              outstandingBalance: customer.outstandingBalance,
             },
           });
           syncedCustomerIds.push(customer.id);
@@ -365,19 +362,7 @@ export class SyncController {
               });
             }
 
-            if (order.paymentMode === 'CREDIT' && order.customerId) {
-              const creditAmount = Number(order.totalAmount) - Number(order.discountAmount) - Number(order.paidAmount);
-              if (creditAmount > 0) {
-                await tx.customer.update({
-                  where: { id: order.customerId },
-                  data: {
-                    outstandingBalance: {
-                      increment: creditAmount,
-                    },
-                  },
-                });
-              }
-            }
+            // Outstanding balance must be derived, not mutated here.
           }
           syncedOrderIds.push(order.id);
         }
@@ -410,14 +395,6 @@ export class SyncController {
               },
             });
 
-            await tx.customer.update({
-              where: { id: payment.customerId },
-              data: {
-                outstandingBalance: {
-                  decrement: payment.amount,
-                },
-              },
-            });
           }
           syncedPaymentIds.push(payment.id);
         }
