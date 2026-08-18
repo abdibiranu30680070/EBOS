@@ -126,7 +126,12 @@ export async function syncNow() {
         const { products: syncedProducts, customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts, suppliers: syncedSuppliers, purchaseOrders: syncedPOs, branches: syncedBranches, users: syncedUsers } = pushResult.synced;
         console.log('Synced IDs:', { syncedProducts, syncedCusts, syncedOrders, syncedMvs, syncedPmts, syncedSuppliers, syncedPOs, syncedBranches, syncedUsers });
 
-        // Mark pushed records as SYNCED
+        const failedItems = pushResult.failed || [];
+        if (failedItems.length > 0) {
+          console.warn('[SyncEngine] Some records were rejected by the server:', failedItems);
+        }
+
+        // Mark pushed records as SYNCED, and rejected records as FAILED
         await db.transaction('rw', [db.products, db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements, db.suppliers, db.purchaseOrders, db.branches, db.users], async () => {
           if (syncedProducts?.length > 0) {
             await Promise.all(syncedProducts.map(id => db.products.update(id, { syncStatus: 'SYNCED' })));
@@ -154,6 +159,17 @@ export async function syncNow() {
           }
           if (syncedUsers?.length > 0) {
             await Promise.all(syncedUsers.map(id => db.users.update(id, { syncStatus: 'SYNCED' })));
+          }
+
+          if (failedItems.length > 0) {
+            await Promise.all(failedItems.map(({ id, type }) => {
+              if (type === 'product') return db.products.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              if (type === 'customer') return db.customers.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              if (type === 'supplier') return db.suppliers.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              if (type === 'inventory') return db.inventoryMovements.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              if (type === 'branch') return db.branches.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              return Promise.resolve();
+            }));
           }
         });
         console.log('Successfully pushed local changes.');

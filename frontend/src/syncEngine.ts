@@ -131,34 +131,50 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
         const { products: syncedProducts, customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts, suppliers: syncedSuppliers, purchaseOrders: syncedPurchaseOrders, branches: syncedBranches, users: syncedUsers } = pushResult.synced;
         console.log('Synced IDs:', { syncedProducts, syncedCusts, syncedOrders, syncedMvs, syncedPmts, syncedSuppliers, syncedPurchaseOrders, syncedBranches, syncedUsers });
 
-        // Mark pushed records as SYNCED
+        const failedItems: Array<{ id: string; type: string; reason?: string }> = pushResult.failed || [];
+        if (failedItems.length > 0) {
+          console.warn('[SyncEngine] Some records were rejected by the server:', failedItems);
+        }
+
+        // Mark pushed records as SYNCED, and rejected records as FAILED
         await db.transaction('rw', [db.products, db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements, db.suppliers, db.purchaseOrders, db.branches, db.users], async () => {
-          if (syncedProducts.length > 0) {
+          if (syncedProducts?.length > 0) {
             await Promise.all(syncedProducts.map((id: string) => db.products.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedCusts.length > 0) {
+          if (syncedCusts?.length > 0) {
             await Promise.all(syncedCusts.map((id: string) => db.customers.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedOrders.length > 0) {
+          if (syncedOrders?.length > 0) {
             await Promise.all(syncedOrders.map((id: string) => db.salesOrders.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedPmts.length > 0) {
+          if (syncedPmts?.length > 0) {
             await Promise.all(syncedPmts.map((id: string) => db.customerPayments.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedMvs.length > 0) {
+          if (syncedMvs?.length > 0) {
             await Promise.all(syncedMvs.map((id: string) => db.inventoryMovements.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedSuppliers.length > 0) {
+          if (syncedSuppliers?.length > 0) {
             await Promise.all(syncedSuppliers.map((id: string) => db.suppliers.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedPurchaseOrders.length > 0) {
+          if (syncedPurchaseOrders?.length > 0) {
             await Promise.all(syncedPurchaseOrders.map((id: string) => db.purchaseOrders.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedBranches.length > 0) {
+          if (syncedBranches?.length > 0) {
             await Promise.all(syncedBranches.map((id: string) => db.branches.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedUsers.length > 0) {
+          if (syncedUsers?.length > 0) {
             await Promise.all(syncedUsers.map((id: string) => db.users.update(id, { syncStatus: 'SYNCED' })));
+          }
+
+          if (failedItems.length > 0) {
+            await Promise.all(failedItems.map(({ id, type }) => {
+              if (type === 'product') return db.products.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              if (type === 'customer') return db.customers.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              if (type === 'supplier') return db.suppliers.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              if (type === 'inventory') return db.inventoryMovements.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              if (type === 'branch') return db.branches.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+              return Promise.resolve();
+            }));
           }
         });
         console.log('Successfully pushed local changes.');
