@@ -868,9 +868,9 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Customers Outstanding list */}
             <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-3 border-b border-slate-100 gap-3">
                 <h3 className="text-lg font-bold text-slate-900">Credit Customer Balances</h3>
-                <button onClick={() => setShowPayModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition duration-150 cursor-pointer">
+                <button onClick={() => setShowPayModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition duration-150 cursor-pointer whitespace-nowrap">
                   💰 Collect Outstanding Balance
                 </button>
               </div>
@@ -960,7 +960,6 @@ export default function App() {
           <SettingsPage currentUser={user} />
         )}
       </main>
-    </div>
 
       {/* MODAL 1: ADD CUSTOMER POPUP (POS SHORTCUT) */}
       {showAddCustomer && (
