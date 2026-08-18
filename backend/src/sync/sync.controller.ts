@@ -307,20 +307,23 @@ export class SyncController {
           syncedPurchaseOrderIds.push(po.id);
         }
 
-        // Process Customers
+        // Process Customers (upsert so offline-created customers are inserted)
         for (const customer of customers) {
-          const existingCustomer = await tx.customer.findUnique({ where: { id: customer.id } });
-          if (!existingCustomer) {
-            pushFailure(customer.id, 'customer', 'CUSTOMER_NOT_FOUND', `Customer ${customer.id} must exist before syncing a customer record.`);
-            continue;
-          }
-
-          await tx.customer.update({
+          await tx.customer.upsert({
             where: { id: customer.id },
-            data: {
+            update: {
               name: customer.name,
-              phone: customer.phone,
-              creditLimit: customer.creditLimit,
+              phone: customer.phone || null,
+              creditLimit: customer.creditLimit ?? 0,
+              outstandingBalance: customer.outstandingBalance ?? 0,
+            },
+            create: {
+              id: customer.id,
+              businessId,
+              name: customer.name,
+              phone: customer.phone || null,
+              creditLimit: customer.creditLimit ?? 0,
+              outstandingBalance: customer.outstandingBalance ?? 0,
             },
           });
           syncedCustomerIds.push(customer.id);
