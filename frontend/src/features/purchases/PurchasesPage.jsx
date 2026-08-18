@@ -15,9 +15,24 @@ export function PurchasesPage({ user }) {
   const [showAdd, setShowAdd] = useState(false);
   const toast = useToast();
 
-  const suppliers = useLiveQuery(() => db.suppliers.toArray()) || [];
-  const products = useLiveQuery(() => db.products.where('isActive').equals(1).toArray()) || [];
-  const purchaseOrders = useLiveQuery(() => db.purchaseOrders.toArray()) || [];
+  const busId = user?.businessId;
+
+  const suppliers = useLiveQuery(
+    () => busId ? db.suppliers.filter(s => s.businessId === busId).toArray() : db.suppliers.toArray(),
+    [busId]
+  ) || [];
+
+  const products = useLiveQuery(
+    () => busId
+      ? db.products.filter(p => p.businessId === busId && (p.isActive === 1 || p.isActive === true)).toArray()
+      : db.products.filter(p => p.isActive === 1 || p.isActive === true).toArray(),
+    [busId]
+  ) || [];
+
+  const purchaseOrders = useLiveQuery(
+    () => db.purchaseOrders.toArray(),
+    []
+  ) || [];
 
   return (
     <>
