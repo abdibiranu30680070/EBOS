@@ -29,8 +29,8 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
     const pendingOrders = await db.salesOrders.where('syncStatus').equals('PENDING').toArray();
     const pendingPayments = await db.customerPayments.where('syncStatus').equals('PENDING').toArray();
     const pendingMovements = await db.inventoryMovements.where('syncStatus').equals('PENDING').toArray();
-    const pendingBranches = await db.branches.where('syncStatus').equals('PENDING').toArray();
-    const pendingUsers = await db.users.where('syncStatus').equals('PENDING').toArray();
+    const pendingBranches = db.branches ? await db.branches.where('syncStatus').equals('PENDING').toArray() : [];
+    const pendingUsers = db.users ? await db.users.where('syncStatus').equals('PENDING').toArray() : [];
 
     console.log('Pending counts:', {
       customers: pendingCustomers.length,
@@ -146,9 +146,13 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
     const { serverTime, changes } = pullResult;
 
     // Apply downloaded updates to the local database in a transaction
+    const pullTables = [db.products, db.customers, db.inventoryMovements, db.salesOrders, db.salesOrderItems, db.customerPayments, db.syncMetadata];
+    if (db.branches) pullTables.push(db.branches);
+    if (db.users) pullTables.push(db.users);
+
     await db.transaction(
       'rw',
-      [db.products, db.customers, db.inventoryMovements, db.salesOrders, db.salesOrderItems, db.customerPayments, db.branches, db.users, db.syncMetadata],
+      pullTables,
       async () => {
         // Save Products
         for (const product of changes.products || []) {

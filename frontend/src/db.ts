@@ -179,7 +179,7 @@ class EbosDatabase extends Dexie {
       salesOrders: 'id, branchId, customerId, syncStatus, createdAt',
       salesOrderItems: 'id, orderId, productId',
       customerPayments: 'id, businessId, customerId, syncStatus, createdAt',
-      branches: 'id, businessId, name, isActive',
+      branches: 'id, businessId, name, syncStatus, isActive',
       users: 'id, branchId, role, syncStatus',
       suppliers: 'id, businessId, name, syncStatus',
       purchaseOrders: 'id, branchId, supplierId, syncStatus, createdAt',
