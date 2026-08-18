@@ -884,6 +884,7 @@ export default function App() {
                       <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Credit Limit</th>
                       <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Outstanding Debt</th>
                       <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Sync</th>
+                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -903,6 +904,18 @@ export default function App() {
                           }`}>
                             {c.syncStatus}
                           </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => {
+                              setPayCustomerId(c.id);
+                              setPayAmount(c.outstandingBalance > 0 ? c.outstandingBalance : 0);
+                              setShowPayModal(true);
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition duration-150 cursor-pointer"
+                          >
+                            💰 Pay
+                          </button>
                         </td>
                       </tr>
                     ))}
