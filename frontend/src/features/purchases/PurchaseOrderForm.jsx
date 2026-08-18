@@ -181,7 +181,7 @@ export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
             <span className="text-slate-500 font-semibold">{totalItems} line{totalItems !== 1 ? 's' : ''} added</span>
           </div>
 
-          <div className="divide-y divide-slate-200 overflow-y-auto max-h-80">
+          <div className="divide-y divide-slate-200">
             {lines.map((line, index) => {
               const subtotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0);
 
@@ -245,7 +245,7 @@ export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
           </div>
 
           {/* Odoo Style "Add a line" Action Bar */}
-          <div className="p-3 bg-slate-100/50 border-t border-slate-200">
+          <div className="p-3 bg-slate-100/50 border-t border-slate-200 relative z-0">
             <button
               type="button"
               onClick={addLine}

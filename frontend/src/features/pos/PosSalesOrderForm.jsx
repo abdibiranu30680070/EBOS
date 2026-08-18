@@ -204,7 +204,7 @@ export function PosSalesOrderForm({
             <span className="text-slate-500 font-bold">{validLines.length} line{validLines.length !== 1 ? 's' : ''} configured</span>
           </div>
 
-          <div className="divide-y divide-slate-200 overflow-y-auto max-h-[360px]">
+          <div className="divide-y divide-slate-200">
             {lines.map((line, index) => {
               const subtotal = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0);
               const selectedProd = products.find(p => p.id === line.productId);
@@ -288,7 +288,7 @@ export function PosSalesOrderForm({
           </div>
 
           {/* Odoo Style "Add a line" Action Bar */}
-          <div className="p-3 bg-slate-100/70 border-t border-slate-200">
+          <div className="p-3 bg-slate-100/70 border-t border-slate-200 relative z-0">
             <button
               type="button"
               onClick={addLine}
