@@ -45,6 +45,7 @@ async function _pushPendingChanges() {
   const pendingMovements  = await db.inventoryMovements.where('syncStatus').equals('PENDING').toArray();
   const pendingSuppliers  = await db.suppliers.where('syncStatus').equals('PENDING').toArray().catch(() => []);
   const pendingPOs        = await db.purchaseOrders.where('syncStatus').equals('PENDING').toArray().catch(() => []);
+  const pendingBranches   = await db.branches.where('syncStatus').equals('PENDING').toArray().catch(() => []);
 
   // Enrich orders with their line items
   const ordersWithItems = await Promise.all(
@@ -117,7 +118,8 @@ async function _pushPendingChanges() {
     pendingPayments.length > 0 ||
     pendingMovements.length > 0 ||
     pendingSuppliers.length > 0 ||
-    posWithItems.length > 0;
+    posWithItems.length > 0 ||
+    pendingBranches.length > 0;
 
   if (!hasChanges) {
     console.log('[SyncEngine] No pending entity changes to push.');
@@ -141,6 +143,7 @@ async function _pushPendingChanges() {
       inventoryMovements: pendingMovements,
       suppliers:          pendingSuppliers,
       purchaseOrders:     posWithItems,
+      branches:           pendingBranches,
     }),
   });
 
@@ -149,7 +152,7 @@ async function _pushPendingChanges() {
   const result = await response.json();
   if (!result.success || !result.synced) return;
 
-  const { customers: sc, salesOrders: so, inventoryMovements: sm, payments: sp, suppliers: ss, purchaseOrders: spo } = result.synced;
+  const { customers: sc, salesOrders: so, inventoryMovements: sm, payments: sp, suppliers: ss, purchaseOrders: spo, branches: sb } = result.synced;
 
   const failedItems = result.failed || [];
   if (failedItems.length) {
@@ -158,7 +161,7 @@ async function _pushPendingChanges() {
 
   await db.transaction('rw', [
     db.products, db.customers, db.salesOrders, db.customerPayments,
-    db.inventoryMovements, db.suppliers, db.purchaseOrders
+    db.inventoryMovements, db.suppliers, db.purchaseOrders, db.branches
   ], async () => {
     if (result.synced.products?.length) await Promise.all(result.synced.products.map(id => db.products.update(id, { syncStatus: 'SYNCED' })));
     if (sc?.length) await Promise.all(sc.map(id => db.customers.update(id, { syncStatus: 'SYNCED' })));
@@ -167,6 +170,7 @@ async function _pushPendingChanges() {
     if (sm?.length) await Promise.all(sm.map(id => db.inventoryMovements.update(id, { syncStatus: 'SYNCED' })));
     if (ss?.length) await Promise.all(ss.map(id => db.suppliers.update(id, { syncStatus: 'SYNCED' })));
     if (spo?.length) await Promise.all(spo.map(id => db.purchaseOrders.update(id, { syncStatus: 'SYNCED' })));
+    if (sb?.length) await Promise.all(sb.map(id => db.branches.update(id, { syncStatus: 'SYNCED' })));
 
     if (failedItems.length) {
       await Promise.all(failedItems.map(({ id, type }) => {
@@ -174,6 +178,7 @@ async function _pushPendingChanges() {
         if (type === 'customer') return db.customers.where('id').equals(id).modify({ syncStatus: 'FAILED' });
         if (type === 'supplier') return db.suppliers.where('id').equals(id).modify({ syncStatus: 'FAILED' });
         if (type === 'inventory') return db.inventoryMovements.where('id').equals(id).modify({ syncStatus: 'FAILED' });
+        if (type === 'branch') return db.branches.where('id').equals(id).modify({ syncStatus: 'FAILED' });
         return Promise.resolve();
       }));
     }
@@ -203,7 +208,8 @@ async function _pullRemoteChanges() {
     [
       db.products, db.customers, db.inventoryMovements, db.salesOrders, 
       db.salesOrderItems, db.customerPayments, db.syncMetadata,
-      db.suppliers, db.purchaseOrders, db.purchaseOrderItems
+      db.suppliers, db.purchaseOrders, db.purchaseOrderItems,
+      db.branches, db.users
     ],
     async () => {
       // Products
@@ -263,6 +269,25 @@ async function _pullRemoteChanges() {
         for (const item of po.items || []) {
           await db.purchaseOrderItems.put(item);
         }
+      }
+
+      // Branches
+      for (const b of changes.branches || []) {
+        await db.branches.put({
+          ...b,
+          isActive: (b.isActive === true || b.isActive === 1) ? 1 : 0,
+          syncStatus: 'SYNCED'
+        });
+      }
+
+      // Users (without overwriting locally stored passwords)
+      for (const u of changes.users || []) {
+        const existing = await db.users.get(u.id);
+        await db.users.put({
+          ...u,
+          password: existing?.password || u.password || null,
+          syncStatus: 'SYNCED'
+        });
       }
 
       // Update watermark

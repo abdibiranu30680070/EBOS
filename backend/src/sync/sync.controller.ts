@@ -97,8 +97,37 @@ export class SyncController {
       include: {
         items: true,
       },
+    });
+
+    const branches = await this.prisma.branch.findMany({
+      where: {
+        businessId,
+        updatedAt: { gt: lastSyncedAt },
+      },
     }).catch(err => {
-      console.warn('[SyncPull] Error fetching purchaseOrders:', err.message);
+      console.warn('[SyncPull] Error fetching branches:', err.message);
+      return [];
+    });
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        businessId,
+        updatedAt: { gt: lastSyncedAt },
+      },
+      select: {
+        id: true,
+        businessId: true,
+        branchId: true,
+        username: true,
+        role: true,
+        fullName: true,
+        phoneNumber: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching users:', err.message);
       return [];
     });
 
@@ -112,6 +141,8 @@ export class SyncController {
         payments,
         suppliers,
         purchaseOrders,
+        branches,
+        users,
       },
     };
   }
