@@ -241,23 +241,36 @@ export default function App() {
     }
   }, [paymentMode, cartTotal]);
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (customLines?: any[]) => {
     setCheckoutError('');
-    if (cart.length === 0) {
-      setCheckoutError('Cart is empty.');
+    
+    // Handle both old cart format and new order lines format
+    const linesToProcess = customLines || cart.map(item => ({
+      product: item.product,
+      productId: item.product.id,
+      quantity: item.quantity,
+      unitPrice: item.product.sellingPrice,
+    }));
+
+    if (linesToProcess.length === 0) {
+      setCheckoutError('No items to checkout.');
       return;
     }
 
     const customer = customers.find((c) => c.id === selectedCustomerId);
+    
+    // Calculate totals from lines
+    const lineSubtotal = linesToProcess.reduce((sum, line) => {
+      const qty = Number(line.quantity) || 0;
+      const price = Number(line.unitPrice) || 0;
+      return sum + (qty * price);
+    }, 0);
+    const lineTotal = Math.max(0, lineSubtotal - discountAmount);
 
-    // Verify Credit Sale Constraints
-    if (paymentMode === 'CREDIT') {
-      if (!selectedCustomerId) {
-        setCheckoutError('A customer must be selected for Credit sales.');
-        return;
-      }
+    // Verify Credit Constraints for partial payments
+    if (selectedCustomerId && paidAmount < lineTotal) {
       if (customer) {
-        const netCreditAmount = cartTotal - paidAmount;
+        const netCreditAmount = lineTotal - paidAmount;
         const totalProjectedDebt = customer.outstandingBalance + netCreditAmount;
         if (totalProjectedDebt > customer.creditLimit) {
           setCheckoutError(`Credit limit exceeded! Customer credit limit is ETB ${customer.creditLimit.toLocaleString()}. Projected outstanding balance would be ETB ${totalProjectedDebt.toLocaleString()}.`);
@@ -275,7 +288,7 @@ export default function App() {
         branchId: user.branchId || 'br_mercato_main',
         customerId: selectedCustomerId || null,
         userId: user.id,
-        totalAmount: cartTotal,
+        totalAmount: lineTotal,
         discountAmount: discountAmount,
         paidAmount: paidAmount,
         paymentMode: paymentMode,
@@ -283,21 +296,21 @@ export default function App() {
         syncStatus: 'PENDING',
       };
 
-      // Create Order Items & Inventory Movements
-      const orderItems = cart.map((item) => ({
+      // Create Order Items & Inventory Movements from lines
+      const orderItems = linesToProcess.map((line) => ({
         id: generateId('item'),
         orderId: orderId,
-        productId: item.product.id,
-        quantity: item.quantity,
-        unitPrice: item.product.sellingPrice,
-        totalPrice: item.product.sellingPrice * item.quantity,
+        productId: line.productId,
+        quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice),
+        totalPrice: Number(line.quantity) * Number(line.unitPrice),
       }));
 
-      const inventoryMvs = cart.map((item) => ({
+      const inventoryMvs = linesToProcess.map((line) => ({
         id: generateId('mv'),
         branchId: user.branchId || 'br_mercato_main',
-        productId: item.product.id,
-        quantityDelta: -item.quantity,
+        productId: line.productId,
+        quantityDelta: -Number(line.quantity),
         type: 'SALE' as const,
         referenceId: orderId,
         createdAt: new Date().toISOString(),
@@ -310,16 +323,20 @@ export default function App() {
         await db.salesOrderItems.bulkAdd(orderItems);
         await db.inventoryMovements.bulkAdd(inventoryMvs);
 
-        // Adjust local outstanding balance for customer if CREDIT sale
-        if (paymentMode === 'CREDIT' && selectedCustomerId) {
-          const creditAmount = cartTotal - paidAmount;
+        // Adjust local outstanding balance for customer if partial payment or CREDIT sale
+        console.log('Credit sale check:', { paymentMode, selectedCustomerId, lineTotal, paidAmount });
+        if (selectedCustomerId && paidAmount < lineTotal) {
+          const creditAmount = lineTotal - paidAmount;
+          console.log('Credit amount to add:', creditAmount);
           if (creditAmount > 0) {
             const currentCust = await db.customers.get(selectedCustomerId);
+            console.log('Current customer balance:', currentCust?.outstandingBalance);
             if (currentCust) {
               await db.customers.update(selectedCustomerId, {
                 outstandingBalance: currentCust.outstandingBalance + creditAmount,
                 syncStatus: 'PENDING',
               });
+              console.log('Updated customer balance to:', currentCust.outstandingBalance + creditAmount);
             }
           }
         }
@@ -340,12 +357,12 @@ export default function App() {
         businessName: user.businessName || 'Mercato Wholesale Traders',
         branchName: user.branchName || 'Mercato Main Store',
         customerName: customer ? customer.name : null,
-        items: cart.map(item => ({
-          productId: item.product.id,
-          name: item.product.name,
-          quantity: item.quantity,
-          unitPrice: item.product.sellingPrice,
-          totalPrice: item.product.sellingPrice * item.quantity,
+        items: linesToProcess.map(line => ({
+          productId: line.productId,
+          name: line.product?.name || line.productName || 'Product',
+          quantity: Number(line.quantity),
+          unitPrice: Number(line.unitPrice),
+          totalPrice: Number(line.quantity) * Number(line.unitPrice),
         })),
       };
     } catch (err: any) {
@@ -390,7 +407,11 @@ export default function App() {
 
   const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payCustomerId || payAmount <= 0) return;
+    console.log('Payment registration started:', { payCustomerId, payAmount, payMode, payReference });
+    if (!payCustomerId || payAmount <= 0) {
+      console.log('Payment validation failed');
+      return;
+    }
 
     try {
       const paymentId = generateId('pmt');
@@ -405,14 +426,18 @@ export default function App() {
         syncStatus: 'PENDING' as const,
       };
 
+      console.log('Creating payment:', newPayment);
       await db.transaction('rw', [db.customerPayments, db.customers], async () => {
         await db.customerPayments.add(newPayment);
         const currentCust = await db.customers.get(payCustomerId);
+        console.log('Current customer before payment:', currentCust);
         if (currentCust) {
+          const newBalance = Math.max(0, currentCust.outstandingBalance - payAmount);
           await db.customers.update(payCustomerId, {
-            outstandingBalance: Math.max(0, currentCust.outstandingBalance - payAmount),
+            outstandingBalance: newBalance,
             syncStatus: 'PENDING',
           });
+          console.log('Updated customer balance to:', newBalance);
         }
       });
 
@@ -420,10 +445,12 @@ export default function App() {
       setPayAmount(0);
       setPayReference('');
       setShowPayModal(false);
+      console.log('Payment completed successfully');
 
       // Trigger sync
       syncNow();
     } catch (err: any) {
+      console.error('Payment registration error:', err);
       alert(`Failed to log payment: ${err.message}`);
     }
   };
