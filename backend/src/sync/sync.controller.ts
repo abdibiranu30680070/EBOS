@@ -191,10 +191,22 @@ export class SyncController {
           failed.push({ id, type, reason, details });
         };
 
-        // Process Products
+        // Process Products (upsert with SKU collision handling)
         for (const product of products) {
+          const existing = await tx.product.findFirst({
+            where: {
+              businessId,
+              OR: [
+                { id: product.id },
+                { sku: product.sku }
+              ]
+            }
+          });
+
+          const targetId = existing ? existing.id : product.id;
+
           await tx.product.upsert({
-            where: { id: product.id },
+            where: { id: targetId },
             update: {
               sku: product.sku,
               name: product.name,
