@@ -154,6 +154,7 @@ class EbosDatabase extends Dexie {
 
   constructor() {
     super('EbosDatabase');
+
     this.version(1).stores({
       products: 'id, businessId, sku, name',
       customers: 'id, businessId, name, syncStatus',
@@ -161,7 +162,6 @@ class EbosDatabase extends Dexie {
       salesOrders: 'id, branchId, customerId, syncStatus, createdAt',
       salesOrderItems: 'id, orderId, productId',
       customerPayments: 'id, businessId, customerId, syncStatus, createdAt',
-      branches: 'id, businessId, name, isActive',
       syncMetadata: 'key',
     });
 
@@ -171,7 +171,46 @@ class EbosDatabase extends Dexie {
       purchaseOrders: 'id, branchId, supplierId, syncStatus, createdAt',
       purchaseOrderItems: 'id, orderId, productId',
     });
+
+    this.version(3).stores({
+      products: 'id, businessId, sku, name, isActive, syncStatus',
+      customers: 'id, businessId, name, syncStatus',
+      inventoryMovements: 'id, branchId, productId, syncStatus, createdAt',
+      salesOrders: 'id, branchId, customerId, syncStatus, createdAt',
+      salesOrderItems: 'id, orderId, productId',
+      customerPayments: 'id, businessId, customerId, syncStatus, createdAt',
+      branches: 'id, businessId, name, isActive',
+      users: 'id, branchId, role, syncStatus',
+      suppliers: 'id, businessId, name, syncStatus',
+      purchaseOrders: 'id, branchId, supplierId, syncStatus, createdAt',
+      purchaseOrderItems: 'id, orderId, productId',
+      syncMetadata: 'key',
+    });
   }
 }
 
 export const db = new EbosDatabase();
+
+export async function initializeDatabase() {
+  try {
+    await db.open();
+  } catch (err: any) {
+    if (err?.name === 'SchemaError' || err?.name === 'VersionError' || err?.message?.includes('SchemaError')) {
+      console.warn('[DB] Detected stale IndexedDB schema. Resetting local database...');
+      try {
+        await db.delete();
+      } catch {
+        // Ignore delete failures from an already-broken store.
+      }
+      try {
+        await db.open();
+      } catch (openErr) {
+        console.error('[DB] Failed to recreate database after reset:', openErr);
+      }
+    } else {
+      throw err;
+    }
+  }
+}
+
+void initializeDatabase();

@@ -242,6 +242,7 @@ export default function App() {
   }, [paymentMode, cartTotal]);
 
   const handleCheckout = async (customLines?: any[] | { error: string }) => {
+    console.log('handleCheckout called with:', { customLines, selectedCustomerId, paidAmount, paymentMode });
     setCheckoutError('');
     
     // Handle error from POS form validation
@@ -258,12 +259,15 @@ export default function App() {
       unitPrice: item.product.sellingPrice,
     }));
 
+    console.log('Lines to process:', linesToProcess);
+
     if (linesToProcess.length === 0) {
       setCheckoutError('No items to checkout.');
       return;
     }
 
     const customer = customers.find((c) => c.id === selectedCustomerId);
+    console.log('Found customer:', customer);
     
     // Calculate totals from lines
     const lineSubtotal = linesToProcess.reduce((sum, line) => {
@@ -273,11 +277,14 @@ export default function App() {
     }, 0);
     const lineTotal = Math.max(0, lineSubtotal - discountAmount);
 
+    console.log('Calculated totals:', { lineSubtotal, lineTotal, discountAmount, paidAmount });
+
     // Verify Credit Constraints for partial payments
     if (selectedCustomerId && paidAmount < lineTotal) {
       if (customer) {
         const netCreditAmount = lineTotal - paidAmount;
         const totalProjectedDebt = customer.outstandingBalance + netCreditAmount;
+        console.log('Credit check:', { netCreditAmount, totalProjectedDebt, creditLimit: customer.creditLimit });
         if (totalProjectedDebt > customer.creditLimit) {
           setCheckoutError(`Credit limit exceeded! Customer credit limit is ETB ${customer.creditLimit.toLocaleString()}. Projected outstanding balance would be ETB ${totalProjectedDebt.toLocaleString()}.`);
           return;
