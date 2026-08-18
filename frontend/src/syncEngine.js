@@ -25,18 +25,24 @@ export async function syncNow() {
     // ==========================================
     // 1. PUSH STEP (Upload Local Pending Changes)
     // ==========================================
+    const pendingProducts = await db.products.where('syncStatus').equals('PENDING').toArray().catch(() => []);
     const pendingCustomers = await db.customers.where('syncStatus').equals('PENDING').toArray();
     const pendingOrders = await db.salesOrders.where('syncStatus').equals('PENDING').toArray();
     const pendingPayments = await db.customerPayments.where('syncStatus').equals('PENDING').toArray();
     const pendingMovements = await db.inventoryMovements.where('syncStatus').equals('PENDING').toArray();
-    const pendingBranches = await db.branches.where('syncStatus').equals('PENDING').toArray();
-    const pendingUsers = await db.users.where('syncStatus').equals('PENDING').toArray();
+    const pendingSuppliers = await db.suppliers.where('syncStatus').equals('PENDING').toArray().catch(() => []);
+    const pendingPOs = await db.purchaseOrders.where('syncStatus').equals('PENDING').toArray().catch(() => []);
+    const pendingBranches = await db.branches.where('syncStatus').equals('PENDING').toArray().catch(() => []);
+    const pendingUsers = await db.users.where('syncStatus').equals('PENDING').toArray().catch(() => []);
 
     console.log('Pending counts:', {
+      products: pendingProducts.length,
       customers: pendingCustomers.length,
       orders: pendingOrders.length,
       payments: pendingPayments.length,
       movements: pendingMovements.length,
+      suppliers: pendingSuppliers.length,
+      purchaseOrders: pendingPOs.length,
       branches: pendingBranches.length,
       users: pendingUsers.length
     });
@@ -63,29 +69,50 @@ export async function syncNow() {
       });
     }
 
-    if (
+    const posWithItems = [];
+    for (const po of pendingPOs) {
+      const items = await db.purchaseOrderItems.where('orderId').equals(po.id).toArray().catch(() => []);
+      posWithItems.push({
+        ...po,
+        items: items.map(it => ({ id: it.id, productId: it.productId, quantity: it.quantity, unitPrice: it.unitPrice, totalPrice: it.totalPrice }))
+      });
+    }
+
+    const hasChanges =
+      pendingProducts.length > 0 ||
       pendingCustomers.length > 0 ||
       ordersWithItems.length > 0 ||
       pendingPayments.length > 0 ||
       pendingMovements.length > 0 ||
+      pendingSuppliers.length > 0 ||
+      posWithItems.length > 0 ||
       pendingBranches.length > 0 ||
-      pendingUsers.length > 0
-    ) {
+      pendingUsers.length > 0;
+
+    if (hasChanges) {
       console.log('Pushing local modifications to server...');
       const headers = {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       };
+      const formattedProducts = pendingProducts.map(p => ({
+        ...p,
+        isActive: p.isActive === 1 || p.isActive === true
+      }));
+
       const pushResponse = await fetch(`${API_BASE_URL}/api/v1/sync/push`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          customers: pendingCustomers,
-          salesOrders: ordersWithItems,
-          payments: pendingPayments,
+          products:           formattedProducts,
+          customers:          pendingCustomers,
+          salesOrders:        ordersWithItems,
+          payments:           pendingPayments,
           inventoryMovements: pendingMovements,
-          branches: pendingBranches,
-          users: pendingUsers
+          suppliers:          pendingSuppliers,
+          purchaseOrders:     posWithItems,
+          branches:           pendingBranches,
+          users:              pendingUsers
         })
       });
 
@@ -96,27 +123,36 @@ export async function syncNow() {
       const pushResult = await pushResponse.json();
       console.log('Push response:', pushResult);
       if (pushResult.success && pushResult.synced) {
-        const { customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts, branches: syncedBranches, users: syncedUsers } = pushResult.synced;
-        console.log('Synced IDs:', { syncedCusts, syncedOrders, syncedMvs, syncedPmts, syncedBranches, syncedUsers });
+        const { products: syncedProducts, customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts, suppliers: syncedSuppliers, purchaseOrders: syncedPOs, branches: syncedBranches, users: syncedUsers } = pushResult.synced;
+        console.log('Synced IDs:', { syncedProducts, syncedCusts, syncedOrders, syncedMvs, syncedPmts, syncedSuppliers, syncedPOs, syncedBranches, syncedUsers });
 
         // Mark pushed records as SYNCED
-        await db.transaction('rw', [db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements, db.branches, db.users], async () => {
-          if (syncedCusts.length > 0) {
+        await db.transaction('rw', [db.products, db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements, db.suppliers, db.purchaseOrders, db.branches, db.users], async () => {
+          if (syncedProducts?.length > 0) {
+            await Promise.all(syncedProducts.map(id => db.products.update(id, { syncStatus: 'SYNCED' })));
+          }
+          if (syncedCusts?.length > 0) {
             await Promise.all(syncedCusts.map(id => db.customers.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedOrders.length > 0) {
+          if (syncedOrders?.length > 0) {
             await Promise.all(syncedOrders.map(id => db.salesOrders.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedPmts.length > 0) {
+          if (syncedPmts?.length > 0) {
             await Promise.all(syncedPmts.map(id => db.customerPayments.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedMvs.length > 0) {
+          if (syncedMvs?.length > 0) {
             await Promise.all(syncedMvs.map(id => db.inventoryMovements.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedBranches.length > 0) {
+          if (syncedSuppliers?.length > 0) {
+            await Promise.all(syncedSuppliers.map(id => db.suppliers.update(id, { syncStatus: 'SYNCED' })));
+          }
+          if (syncedPOs?.length > 0) {
+            await Promise.all(syncedPOs.map(id => db.purchaseOrders.update(id, { syncStatus: 'SYNCED' })));
+          }
+          if (syncedBranches?.length > 0) {
             await Promise.all(syncedBranches.map(id => db.branches.update(id, { syncStatus: 'SYNCED' })));
           }
-          if (syncedUsers.length > 0) {
+          if (syncedUsers?.length > 0) {
             await Promise.all(syncedUsers.map(id => db.users.update(id, { syncStatus: 'SYNCED' })));
           }
         });

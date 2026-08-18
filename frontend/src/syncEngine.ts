@@ -100,19 +100,24 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       };
+      const formattedProducts = pendingProducts.map(p => ({
+        ...p,
+        isActive: p.isActive === 1 || p.isActive === true
+      }));
+
       const pushResponse = await fetch(`${API_BASE_URL}/api/v1/sync/push`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          products: pendingProducts,
-          customers: pendingCustomers,
-          salesOrders: ordersWithItems,
-          payments: pendingPayments,
+          products:           formattedProducts,
+          customers:          pendingCustomers,
+          salesOrders:        ordersWithItems,
+          payments:           pendingPayments,
           inventoryMovements: pendingMovements,
-          suppliers: pendingSuppliers,
-          purchaseOrders: purchaseOrdersWithItems,
-          branches: pendingBranches,
-          users: pendingUsers
+          suppliers:          pendingSuppliers,
+          purchaseOrders:     purchaseOrdersWithItems,
+          branches:           pendingBranches,
+          users:              pendingUsers
         })
       });
 
