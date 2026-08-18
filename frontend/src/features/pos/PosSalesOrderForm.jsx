@@ -211,7 +211,7 @@ export function PosSalesOrderForm({
               const currentStock  = selectedProd ? (stockBalances[selectedProd.id] || 0) : null;
 
               return (
-                <div key={line.id} className="p-3 bg-white flex flex-col sm:flex-row items-center gap-3 hover:bg-slate-50/80 transition-colors">
+                <div key={line.id} className="p-3 bg-white flex flex-col sm:flex-row items-center gap-3 hover:bg-slate-50/80 transition-colors relative focus-within:z-50">
                   
                   {/* Line Index */}
                   <span className="text-xs font-extrabold text-slate-400 w-6 shrink-0 text-center">{index + 1}</span>

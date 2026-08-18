@@ -39,7 +39,7 @@ export function SearchableProductSelect({ products = [], selectedProductId = '',
   });
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div className={`relative w-full ${isOpen ? 'z-[100]' : 'z-10'}`} ref={dropdownRef}>
       <div className="relative">
         <input
           type="text"
@@ -61,7 +61,7 @@ export function SearchableProductSelect({ products = [], selectedProductId = '',
               onSelect('');
               setIsOpen(true);
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs bg-slate-200 rounded-full w-5 h-5 flex items-center justify-center font-bold"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs bg-slate-200 rounded-full w-5 h-5 flex items-center justify-center font-bold z-10"
           >
             ✕
           </button>
@@ -70,7 +70,7 @@ export function SearchableProductSelect({ products = [], selectedProductId = '',
 
       {/* Auto-complete Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] max-h-56 overflow-y-auto divide-y divide-slate-100">
           {filtered.length === 0 ? (
             <div className="p-3 text-xs text-slate-400 text-center">
               No matching products found

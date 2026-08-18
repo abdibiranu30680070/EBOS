@@ -186,7 +186,7 @@ export function PurchaseOrderForm({ suppliers, products, user, onSuccess }) {
               const subtotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0);
 
               return (
-                <div key={line.id} className="p-3 bg-white grid grid-cols-1 gap-3 sm:grid-cols-[24px_minmax(0,1.4fr)_80px_110px_90px_auto] sm:items-center hover:bg-slate-50/80 transition-colors">
+                <div key={line.id} className="p-3 bg-white grid grid-cols-1 gap-3 sm:grid-cols-[24px_minmax(0,1.4fr)_80px_110px_90px_auto] sm:items-center hover:bg-slate-50/80 transition-colors relative focus-within:z-50">
                   <span className="text-xs font-extrabold text-slate-400 w-6 shrink-0 text-center sm:mx-auto">{index + 1}</span>
 
                   <div className="min-w-0 w-full">
