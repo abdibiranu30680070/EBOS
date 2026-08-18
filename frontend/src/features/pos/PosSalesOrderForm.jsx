@@ -77,6 +77,14 @@ export function PosSalesOrderForm({
 
   const handleConfirmOrder = (e) => {
     e.preventDefault();
+    
+    // Validate customer selection for partial payments
+    if (paidAmount < cartTotal && !selectedCustomerId) {
+      const remaining = cartTotal - paidAmount;
+      onCheckout({ error: `Customer Account Required: Paying less than total (ETB ${remaining.toLocaleString()} remaining) requires selecting a Customer account to save as credit.` });
+      return;
+    }
+    
     const formattedPayload = validLines.map(line => {
       const prod = products.find(p => p.id === line.productId);
       return {

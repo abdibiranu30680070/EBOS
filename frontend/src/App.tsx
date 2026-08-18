@@ -241,8 +241,14 @@ export default function App() {
     }
   }, [paymentMode, cartTotal]);
 
-  const handleCheckout = async (customLines?: any[]) => {
+  const handleCheckout = async (customLines?: any[] | { error: string }) => {
     setCheckoutError('');
+    
+    // Handle error from POS form validation
+    if (customLines && typeof customLines === 'object' && 'error' in customLines) {
+      setCheckoutError(customLines.error);
+      return;
+    }
     
     // Handle both old cart format and new order lines format
     const linesToProcess = customLines || cart.map(item => ({
