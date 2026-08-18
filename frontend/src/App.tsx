@@ -13,6 +13,7 @@ import { ProductsPage } from './features/products/ProductsPage.jsx';
 import { ReportsPage } from './features/reports/ReportsPage.jsx';
 import { PurchasesPage } from './features/purchases/PurchasesPage.jsx';
 import { SettingsPage } from './features/settings/SettingsPage.jsx';
+import { ToastProvider } from './components/ui/Toast.jsx';
 
 // Utility for collision-free local ID generation
 const generateId = (prefix: string) => {
@@ -608,7 +609,8 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <ToastProvider>
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Top Header */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex flex-col md:flex-row justify-between items-center sticky top-0 z-10 shadow-sm gap-4">
         <div className="flex items-center justify-between w-full md:w-auto">
@@ -1019,5 +1021,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </ToastProvider>
   );
 }
