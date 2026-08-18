@@ -7,6 +7,11 @@ import { Menu, X } from 'lucide-react';
 import { EbosLogo } from './components/common/EbosLogo.jsx';
 import { API_BASE_URL } from './lib/constants.js';
 import { PosPage } from './features/pos/PosPage.jsx';
+import { InventoryPage } from './features/inventory/InventoryPage.jsx';
+import { CustomersPage } from './features/customers/CustomersPage.jsx';
+import { ProductsPage } from './features/products/ProductsPage.jsx';
+import { ReportsPage } from './features/reports/ReportsPage.jsx';
+import { PurchasesPage } from './features/purchases/PurchasesPage.jsx';
 import { SettingsPage } from './features/settings/SettingsPage.jsx';
 
 // Utility for collision-free local ID generation
@@ -25,7 +30,7 @@ export default function App() {
   const [authError, setAuthError] = useState('');
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'inventory' | 'customers' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pos' | 'inventory' | 'customers' | 'products' | 'reports' | 'purchases' | 'settings'>('dashboard');
   
   // Mobile menu toggle
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -267,7 +272,8 @@ export default function App() {
     }
 
     const customer = customers.find((c) => c.id === selectedCustomerId);
-    console.log('Found customer:', customer);
+    const normalizedCustomerBalance = Math.max(0, Number(customer?.outstandingBalance || 0));
+    console.log('Found customer:', customer, 'normalizedBalance:', normalizedCustomerBalance);
     
     // Calculate totals from lines
     const lineSubtotal = linesToProcess.reduce((sum, line) => {
@@ -283,7 +289,7 @@ export default function App() {
     if (selectedCustomerId && paidAmount < lineTotal) {
       if (customer) {
         const netCreditAmount = lineTotal - paidAmount;
-        const totalProjectedDebt = customer.outstandingBalance + netCreditAmount;
+        const totalProjectedDebt = normalizedCustomerBalance + netCreditAmount;
         console.log('Credit check:', { netCreditAmount, totalProjectedDebt, creditLimit: customer.creditLimit });
         if (totalProjectedDebt > customer.creditLimit) {
           setCheckoutError(`Credit limit exceeded! Customer credit limit is ETB ${customer.creditLimit.toLocaleString()}. Projected outstanding balance would be ETB ${totalProjectedDebt.toLocaleString()}.`);
@@ -343,13 +349,14 @@ export default function App() {
           console.log('Credit amount to add:', creditAmount);
           if (creditAmount > 0) {
             const currentCust = await db.customers.get(selectedCustomerId);
-            console.log('Current customer balance:', currentCust?.outstandingBalance);
+            const currentCustomerBalance = Math.max(0, Number(currentCust?.outstandingBalance || 0));
+            console.log('Current customer balance:', currentCustomerBalance);
             if (currentCust) {
               await db.customers.update(selectedCustomerId, {
-                outstandingBalance: currentCust.outstandingBalance + creditAmount,
+                outstandingBalance: currentCustomerBalance + creditAmount,
                 syncStatus: 'PENDING',
               });
-              console.log('Updated customer balance to:', currentCust.outstandingBalance + creditAmount);
+              console.log('Updated customer balance to:', currentCustomerBalance + creditAmount);
             }
           }
         }
@@ -445,7 +452,8 @@ export default function App() {
         const currentCust = await db.customers.get(payCustomerId);
         console.log('Current customer before payment:', currentCust);
         if (currentCust) {
-          const newBalance = Math.max(0, currentCust.outstandingBalance - payAmount);
+          const currentCustomerBalance = Math.max(0, Number(currentCust.outstandingBalance || 0));
+          const newBalance = Math.max(0, currentCustomerBalance - payAmount);
           await db.customers.update(payCustomerId, {
             outstandingBalance: newBalance,
             syncStatus: 'PENDING',
@@ -648,6 +656,15 @@ export default function App() {
           >
             📦 Inventory
           </button>
+
+          <button
+            onClick={() => { setActiveTab('products'); setSyncMessage(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'products' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            🏷️ Products
+          </button>
           
           <button
             onClick={() => { setActiveTab('customers'); setSyncMessage(null); }}
@@ -656,6 +673,24 @@ export default function App() {
             }`}
           >
             👥 Customers
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('reports'); setSyncMessage(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'reports' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            📈 Reports
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('purchases'); setSyncMessage(null); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'purchases' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            🚚 Purchases
           </button>
 
           <button
@@ -722,6 +757,15 @@ export default function App() {
           >
             📦 Inventory
           </button>
+
+          <button
+            onClick={() => { setActiveTab('products'); setSyncMessage(null); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'products' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            🏷️ Products
+          </button>
           
           <button
             onClick={() => { setActiveTab('customers'); setSyncMessage(null); setMobileMenuOpen(false); }}
@@ -730,6 +774,24 @@ export default function App() {
             }`}
           >
             👥 Customers & Credit
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('reports'); setSyncMessage(null); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'reports' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            📈 Reports
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('purchases'); setSyncMessage(null); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors text-sm ${
+              activeTab === 'purchases' ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            🚚 Purchases
           </button>
 
           <button
@@ -804,208 +866,27 @@ export default function App() {
 
         {/* 3. INVENTORY ADJUSTMENT VIEW */}
         {activeTab === 'inventory' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Product Inventory Table */}
-            <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Stock Ledger Balances</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">SKU</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Product Name</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Cost Price</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Selling Price</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Stock Level</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products.map((p) => {
-                      const bal = stockBalances[p.id] || 0;
-                      const isLow = bal < p.minStockLevel;
-                      return (
-                        <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                          <td className="py-3 px-4 font-mono text-slate-500">{p.sku}</td>
-                          <td className="py-3 px-4 font-medium text-slate-900">{p.name}</td>
-                          <td className="py-3 px-4 text-slate-700">ETB {p.costPrice}</td>
-                          <td className="py-3 px-4 text-slate-700">ETB {p.sellingPrice}</td>
-                          <td className={`py-3 px-4 font-bold ${isLow ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            {bal} {p.unitOfMeasure}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <InventoryPage products={products} stockBalances={stockBalances} user={user} />
+        )}
 
-            {/* Log stock movements */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Register Inventory Movement</h3>
-              <form onSubmit={handleInventoryMovement} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Select Product</label>
-                  <select
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                    value={adjProductId}
-                    onChange={(e) => setAdjProductId(e.target.value)}
-                    required
-                  >
-                    <option value="">-- Choose Product --</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                    ))}
-                  </select>
-                </div>
+        {/* 3B. PRODUCT MANAGEMENT VIEW */}
+        {activeTab === 'products' && (
+          <ProductsPage user={user} />
+        )}
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Movement Action</label>
-                  <select
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                    value={adjType}
-                    onChange={(e) => setAdjType(e.target.value as any)}
-                  >
-                    <option value="STOCK_IN">Stock In (Replenish / Purchase)</option>
-                    <option value="STOCK_OUT">Stock Out (Damage / Loss)</option>
-                    <option value="ADJUSTMENT">Count Discrepancy Adjustment</option>
-                  </select>
-                </div>
+        {/* 3C. PURCHASES VIEW */}
+        {activeTab === 'purchases' && (
+          <PurchasesPage user={user} />
+        )}
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Quantity (Units)</label>
-                  <input
-                    type="number"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                    min="1"
-                    value={adjQty}
-                    onChange={(e) => setAdjQty(Number(e.target.value))}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Notes / Reference</label>
-                  <textarea
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                    rows={3}
-                    placeholder="e.g. GRN Invoice #, Damaged during transit reason"
-                    value={adjNotes}
-                    onChange={(e) => setAdjNotes(e.target.value)}
-                  />
-                </div>
-
-                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer">
-                  Log Movement
-                </button>
-              </form>
-            </div>
-          </div>
+        {/* 3D. REPORTS VIEW */}
+        {activeTab === 'reports' && (
+          <ReportsPage orders={orders} products={products} />
         )}
 
         {/* 4. CUSTOMERS & PAYMENTS VIEW */}
         {activeTab === 'customers' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Customers Outstanding list */}
-            <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-3 border-b border-slate-100 gap-3">
-                <h3 className="text-lg font-bold text-slate-900">Credit Customer Balances</h3>
-                <button onClick={() => setShowPayModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition duration-150 cursor-pointer whitespace-nowrap">
-                  💰 Collect Outstanding Balance
-                </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Customer Name</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Phone</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Credit Limit</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Outstanding Debt</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Sync</th>
-                      <th className="py-2.5 px-4 font-semibold text-slate-600 text-xs">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customers.map((c) => (
-                      <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                        <td className="py-3 px-4 font-bold text-slate-800">{c.name}</td>
-                        <td className="py-3 px-4 text-slate-500 font-mono text-xs">{c.phone || '-'}</td>
-                        <td className="py-3 px-4 text-slate-700">ETB {c.creditLimit.toLocaleString()}</td>
-                        <td className={`py-3 px-4 font-extrabold ${
-                          c.outstandingBalance > 0 ? 'text-rose-600' : 'text-slate-400'
-                        }`}>
-                          ETB {c.outstandingBalance.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                            c.syncStatus === 'SYNCED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                          }`}>
-                            {c.syncStatus}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <button
-                            onClick={() => {
-                              setPayCustomerId(c.id);
-                              setPayAmount(c.outstandingBalance > 0 ? c.outstandingBalance : 0);
-                              setShowPayModal(true);
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition duration-150 cursor-pointer"
-                          >
-                            💰 Pay
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Add Customer Panel */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-fit">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Add Credit Account</h3>
-              <form onSubmit={handleAddCustomer} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Customer Name</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                    value={newCustName}
-                    onChange={(e) => setNewCustName(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Phone Number</label>
-                  <input
-                    type="tel"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                    placeholder="+2519xxxxxxxx"
-                    value={newCustPhone}
-                    onChange={(e) => setNewCustPhone(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Credit Limit (ETB)</label>
-                  <input
-                    type="number"
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-white text-sm"
-                    value={newCustCredit}
-                    onChange={(e) => setNewCustCredit(Number(e.target.value))}
-                  />
-                </div>
-
-                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-3 rounded-lg transition duration-150 cursor-pointer">
-                  Save Account
-                </button>
-              </form>
-            </div>
-          </div>
+          <CustomersPage customers={customers} user={user} />
         )}
 
         {/* 5. CONFIGURATION & SETTINGS VIEW */}
@@ -1080,9 +961,9 @@ export default function App() {
                   required
                 >
                   <option value="">-- Choose Customer --</option>
-                  {customers.filter(c => c.outstandingBalance > 0).map((c) => (
+                  {customers.filter(c => Math.max(0, Number(c.outstandingBalance || 0)) > 0).map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} (Debt: ETB {c.outstandingBalance})
+                      {c.name} (Debt: ETB {Math.max(0, Number(c.outstandingBalance || 0)).toLocaleString()})
                     </option>
                   ))}
                 </select>

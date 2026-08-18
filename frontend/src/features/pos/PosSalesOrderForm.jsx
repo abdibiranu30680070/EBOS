@@ -28,6 +28,7 @@ export function PosSalesOrderForm({
 
   // Selected customer object for credit debt checking
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const selectedCustomerDebt = Math.max(0, Number(selectedCustomer?.outstandingBalance || 0));
 
   // Line actions
   const addLine = () => {
@@ -155,7 +156,7 @@ export function PosSalesOrderForm({
                 ))}
               </select>
 
-              {selectedCustomer && selectedCustomer.outstandingBalance > 0 && (
+              {selectedCustomer && selectedCustomerDebt > 0 && (
                 <button
                   type="button"
                   onClick={() => onShowCollectPayment(selectedCustomer)}

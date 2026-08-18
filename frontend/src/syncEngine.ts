@@ -25,18 +25,24 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
     // ==========================================
     // 1. PUSH STEP (Upload Local Pending Changes)
     // ==========================================
+    const pendingProducts = await db.products.where('syncStatus').equals('PENDING').toArray().catch(() => []);
     const pendingCustomers = await db.customers.where('syncStatus').equals('PENDING').toArray();
     const pendingOrders = await db.salesOrders.where('syncStatus').equals('PENDING').toArray();
     const pendingPayments = await db.customerPayments.where('syncStatus').equals('PENDING').toArray();
     const pendingMovements = await db.inventoryMovements.where('syncStatus').equals('PENDING').toArray();
+    const pendingSuppliers = await db.suppliers.where('syncStatus').equals('PENDING').toArray().catch(() => []);
+    const pendingPurchaseOrders = await db.purchaseOrders.where('syncStatus').equals('PENDING').toArray().catch(() => []);
     const pendingBranches = db.branches ? await db.branches.where('syncStatus').equals('PENDING').toArray() : [];
     const pendingUsers = db.users ? await db.users.where('syncStatus').equals('PENDING').toArray() : [];
 
     console.log('Pending counts:', {
+      products: pendingProducts.length,
       customers: pendingCustomers.length,
       orders: pendingOrders.length,
       payments: pendingPayments.length,
       movements: pendingMovements.length,
+      suppliers: pendingSuppliers.length,
+      purchaseOrders: pendingPurchaseOrders.length,
       branches: pendingBranches.length,
       users: pendingUsers.length
     });
@@ -63,11 +69,29 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
       });
     }
 
+    const purchaseOrdersWithItems = [] as any[];
+    for (const po of pendingPurchaseOrders) {
+      const items = await db.purchaseOrderItems.where('orderId').equals(po.id).toArray().catch(() => []);
+      purchaseOrdersWithItems.push({
+        ...po,
+        items: items.map((it: any) => ({
+          id: it.id,
+          productId: it.productId,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalPrice: it.totalPrice,
+        })),
+      });
+    }
+
     if (
+      pendingProducts.length > 0 ||
       pendingCustomers.length > 0 ||
       ordersWithItems.length > 0 ||
       pendingPayments.length > 0 ||
       pendingMovements.length > 0 ||
+      pendingSuppliers.length > 0 ||
+      purchaseOrdersWithItems.length > 0 ||
       pendingBranches.length > 0 ||
       pendingUsers.length > 0
     ) {
@@ -80,10 +104,13 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
         method: 'POST',
         headers,
         body: JSON.stringify({
+          products: pendingProducts,
           customers: pendingCustomers,
           salesOrders: ordersWithItems,
           payments: pendingPayments,
           inventoryMovements: pendingMovements,
+          suppliers: pendingSuppliers,
+          purchaseOrders: purchaseOrdersWithItems,
           branches: pendingBranches,
           users: pendingUsers
         })
@@ -96,11 +123,14 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
       const pushResult = await pushResponse.json();
       console.log('Push response:', pushResult);
       if (pushResult.success && pushResult.synced) {
-        const { customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts, branches: syncedBranches, users: syncedUsers } = pushResult.synced;
-        console.log('Synced IDs:', { syncedCusts, syncedOrders, syncedMvs, syncedPmts, syncedBranches, syncedUsers });
+        const { products: syncedProducts, customers: syncedCusts, salesOrders: syncedOrders, inventoryMovements: syncedMvs, payments: syncedPmts, suppliers: syncedSuppliers, purchaseOrders: syncedPurchaseOrders, branches: syncedBranches, users: syncedUsers } = pushResult.synced;
+        console.log('Synced IDs:', { syncedProducts, syncedCusts, syncedOrders, syncedMvs, syncedPmts, syncedSuppliers, syncedPurchaseOrders, syncedBranches, syncedUsers });
 
         // Mark pushed records as SYNCED
-        await db.transaction('rw', [db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements, db.branches, db.users], async () => {
+        await db.transaction('rw', [db.products, db.customers, db.salesOrders, db.customerPayments, db.inventoryMovements, db.suppliers, db.purchaseOrders, db.branches, db.users], async () => {
+          if (syncedProducts.length > 0) {
+            await Promise.all(syncedProducts.map((id: string) => db.products.update(id, { syncStatus: 'SYNCED' })));
+          }
           if (syncedCusts.length > 0) {
             await Promise.all(syncedCusts.map((id: string) => db.customers.update(id, { syncStatus: 'SYNCED' })));
           }
@@ -112,6 +142,12 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
           }
           if (syncedMvs.length > 0) {
             await Promise.all(syncedMvs.map((id: string) => db.inventoryMovements.update(id, { syncStatus: 'SYNCED' })));
+          }
+          if (syncedSuppliers.length > 0) {
+            await Promise.all(syncedSuppliers.map((id: string) => db.suppliers.update(id, { syncStatus: 'SYNCED' })));
+          }
+          if (syncedPurchaseOrders.length > 0) {
+            await Promise.all(syncedPurchaseOrders.map((id: string) => db.purchaseOrders.update(id, { syncStatus: 'SYNCED' })));
           }
           if (syncedBranches.length > 0) {
             await Promise.all(syncedBranches.map((id: string) => db.branches.update(id, { syncStatus: 'SYNCED' })));
@@ -146,7 +182,7 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
     const { serverTime, changes } = pullResult;
 
     // Apply downloaded updates to the local database in a transaction
-    const pullTables = [db.products, db.customers, db.inventoryMovements, db.salesOrders, db.salesOrderItems, db.customerPayments, db.syncMetadata];
+    const pullTables = [db.products, db.customers, db.inventoryMovements, db.salesOrders, db.salesOrderItems, db.customerPayments, db.suppliers, db.purchaseOrders, db.purchaseOrderItems, db.syncMetadata];
     if (db.branches) pullTables.push(db.branches);
     if (db.users) pullTables.push(db.users);
 
@@ -180,6 +216,46 @@ export async function syncNow(): Promise<{ success: boolean; message: string }> 
             outstandingBalance: Number(customer.outstandingBalance),
             syncStatus: 'SYNCED'
           });
+        }
+
+        // Save Suppliers
+        for (const supplier of changes.suppliers || []) {
+          await db.suppliers.put({
+            id: supplier.id,
+            businessId: supplier.businessId,
+            name: supplier.name,
+            phone: supplier.phone,
+            contactPerson: supplier.contactPerson,
+            email: supplier.email,
+            address: supplier.address,
+            isActive: supplier.isActive,
+            syncStatus: 'SYNCED'
+          });
+        }
+
+        // Save Purchase Orders & items
+        for (const po of changes.purchaseOrders || []) {
+          await db.purchaseOrders.put({
+            id: po.id,
+            branchId: po.branchId,
+            supplierId: po.supplierId,
+            userId: po.userId,
+            totalAmount: Number(po.totalAmount),
+            status: po.status,
+            createdAt: po.createdAt,
+            syncStatus: 'SYNCED'
+          });
+
+          for (const item of po.items || []) {
+            await db.purchaseOrderItems.put({
+              id: item.id,
+              orderId: item.orderId,
+              productId: item.productId,
+              quantity: Number(item.quantity),
+              unitPrice: Number(item.unitPrice),
+              totalPrice: Number(item.totalPrice)
+            });
+          }
         }
 
         // Save inventory movements (only if they don't already exist locally to prevent duplication)

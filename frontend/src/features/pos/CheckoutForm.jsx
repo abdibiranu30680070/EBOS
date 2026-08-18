@@ -49,7 +49,7 @@ export function CheckoutForm({
               ))}
             </select>
 
-            {selectedCustomer && selectedCustomer.outstandingBalance > 0 && (
+            {selectedCustomer && Math.max(0, Number(selectedCustomer.outstandingBalance || 0)) > 0 && (
               <button
                 type="button"
                 onClick={() => onShowCollectPayment(selectedCustomer)}
