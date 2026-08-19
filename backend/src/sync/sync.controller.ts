@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import * as bcrypt from 'bcryptjs';
 
 @Controller('api/v1/sync')
 @UseGuards(JwtAuthGuard)
@@ -82,11 +83,12 @@ export class SyncController {
       return [];
     });
 
+    // Data minimization: exclude unnecessary sensitive fields from user pull
     const users = await this.prisma.user.findMany({
       where: { businessId, updatedAt: { gt: lastSyncedAt } },
       select: {
         id: true, businessId: true, branchId: true, username: true,
-        role: true, fullName: true, phoneNumber: true, isActive: true,
+        role: true, fullName: true, isActive: true,
         createdAt: true, updatedAt: true,
       }
     }).catch(err => {
@@ -105,7 +107,7 @@ export class SyncController {
 
   @Post('push')
   async push(@Request() req: any, @Body() body: any) {
-    const { businessId, sub: userId } = req.user;
+    const { businessId, sub: userId, role: userRole } = req.user;
     let { branchId } = req.user;
 
     if (!branchId) {
@@ -141,7 +143,7 @@ export class SyncController {
           failed.push({ id, type, reason, details });
         };
 
-        // 1. Process Products (upsert with SKU collision handling)
+        // 1. Process Products (Scope check by businessId)
         for (const product of products) {
           try {
             const existing = await tx.product.findFirst({
@@ -151,96 +153,122 @@ export class SyncController {
               }
             });
 
-            const targetId = existing ? existing.id : product.id;
-
-            await tx.product.upsert({
-              where: { id: targetId },
-              update: {
-                sku: product.sku,
-                name: product.name,
-                costPrice: product.costPrice,
-                sellingPrice: product.sellingPrice,
-                minStockLevel: product.minStockLevel || 0,
-                unitOfMeasure: product.unitOfMeasure || 'Pcs',
-                isActive: product.isActive !== undefined ? product.isActive : true,
-              },
-              create: {
-                id: product.id,
-                businessId,
-                sku: product.sku,
-                name: product.name,
-                costPrice: product.costPrice,
-                sellingPrice: product.sellingPrice,
-                minStockLevel: product.minStockLevel || 0,
-                unitOfMeasure: product.unitOfMeasure || 'Pcs',
-                isActive: product.isActive !== undefined ? product.isActive : true,
-              },
-            });
+            if (existing) {
+              await tx.product.update({
+                where: { id: existing.id },
+                data: {
+                  sku: product.sku,
+                  name: product.name,
+                  costPrice: product.costPrice,
+                  sellingPrice: product.sellingPrice,
+                  minStockLevel: product.minStockLevel || 0,
+                  unitOfMeasure: product.unitOfMeasure || 'Pcs',
+                  isActive: product.isActive !== undefined ? product.isActive : true,
+                },
+              });
+            } else {
+              await tx.product.create({
+                data: {
+                  id: product.id,
+                  businessId,
+                  sku: product.sku,
+                  name: product.name,
+                  costPrice: product.costPrice,
+                  sellingPrice: product.sellingPrice,
+                  minStockLevel: product.minStockLevel || 0,
+                  unitOfMeasure: product.unitOfMeasure || 'Pcs',
+                  isActive: product.isActive !== undefined ? product.isActive : true,
+                },
+              });
+            }
             syncedProductIds.push(product.id);
           } catch (err: any) {
             pushFailure(product.id, 'product', 'PRODUCT_UPSERT_FAILED', err.message);
           }
         }
 
-        // 2. Process Suppliers (upsert)
+        // 2. Process Suppliers (Scope check by businessId)
         for (const supplier of suppliers) {
           try {
-            await tx.supplier.upsert({
-              where: { id: supplier.id },
-              update: {
-                name: supplier.name,
-                phone: supplier.phone || null,
-                email: supplier.email || null,
-                address: supplier.address || null,
-              },
-              create: {
-                id: supplier.id,
-                businessId,
-                name: supplier.name,
-                phone: supplier.phone || null,
-                email: supplier.email || null,
-                address: supplier.address || null,
-              },
+            const existing = await tx.supplier.findFirst({
+              where: { id: supplier.id, businessId }
             });
+
+            if (existing) {
+              await tx.supplier.update({
+                where: { id: existing.id },
+                data: {
+                  name: supplier.name,
+                  phone: supplier.phone || null,
+                  email: supplier.email || null,
+                  address: supplier.address || null,
+                },
+              });
+            } else {
+              await tx.supplier.create({
+                data: {
+                  id: supplier.id,
+                  businessId,
+                  name: supplier.name,
+                  phone: supplier.phone || null,
+                  email: supplier.email || null,
+                  address: supplier.address || null,
+                },
+              });
+            }
             syncedSupplierIds.push(supplier.id);
           } catch (err: any) {
             pushFailure(supplier.id, 'supplier', 'SUPPLIER_UPSERT_FAILED', err.message);
           }
         }
 
-        // 3. Process Customers (upsert)
+        // 3. Process Customers (Scope check by businessId)
         for (const customer of customers) {
           try {
-            await tx.customer.upsert({
-              where: { id: customer.id },
-              update: {
-                name: customer.name,
-                phone: customer.phone || null,
-                creditLimit: customer.creditLimit ?? 0,
-                outstandingBalance: customer.outstandingBalance ?? 0,
-              },
-              create: {
-                id: customer.id,
-                businessId,
-                name: customer.name,
-                phone: customer.phone || null,
-                creditLimit: customer.creditLimit ?? 0,
-                outstandingBalance: customer.outstandingBalance ?? 0,
-              },
+            const existing = await tx.customer.findFirst({
+              where: { id: customer.id, businessId }
             });
+
+            if (existing) {
+              await tx.customer.update({
+                where: { id: existing.id },
+                data: {
+                  name: customer.name,
+                  phone: customer.phone || null,
+                  creditLimit: customer.creditLimit ?? 0,
+                  outstandingBalance: customer.outstandingBalance ?? 0,
+                },
+              });
+            } else {
+              await tx.customer.create({
+                data: {
+                  id: customer.id,
+                  businessId,
+                  name: customer.name,
+                  phone: customer.phone || null,
+                  creditLimit: customer.creditLimit ?? 0,
+                  outstandingBalance: customer.outstandingBalance ?? 0,
+                },
+              });
+            }
             syncedCustomerIds.push(customer.id);
           } catch (err: any) {
             pushFailure(customer.id, 'customer', 'CUSTOMER_UPSERT_FAILED', err.message);
           }
         }
 
-        // 4. Process Purchase Orders
+        // 4. Process Purchase Orders (Scope check by branch's businessId)
         for (const po of purchaseOrders) {
           try {
-            const existingPo = await tx.purchaseOrder.findUnique({ where: { id: po.id } });
+            const existingPo = await tx.purchaseOrder.findFirst({
+              where: { id: po.id, branch: { businessId } }
+            });
+
             if (!existingPo) {
               if (po.supplierId) {
-                const sExists = await tx.supplier.findUnique({ where: { id: po.supplierId } });
+                const sExists = await tx.supplier.findFirst({
+                  where: { id: po.supplierId, businessId }
+                });
                 if (!sExists) {
                   await tx.supplier.create({
                     data: { id: po.supplierId, businessId, name: `Imported Supplier (${po.supplierId.slice(0, 8)})` }
@@ -260,7 +288,9 @@ export class SyncController {
 
               for (const item of po.items || []) {
                 if (!item.productId) continue;
-                const pExists = await tx.product.findUnique({ where: { id: item.productId } });
+                const pExists = await tx.product.findFirst({
+                  where: { id: item.productId, businessId }
+                });
                 if (!pExists) {
                   await tx.product.create({
                     data: { id: item.productId, businessId, sku: `IMP-${item.productId.slice(0,6)}`, name: `Imported Item (${item.productId.slice(0,6)})`, costPrice: 0, sellingPrice: 0 }
@@ -284,14 +314,18 @@ export class SyncController {
           }
         }
 
-        // 5. Process Sales Orders
+        // 5. Process Sales Orders (Scope check by branch's businessId)
         for (const order of salesOrders) {
           try {
-            const existingOrder = await tx.salesOrder.findUnique({ where: { id: order.id } });
+            const existingOrder = await tx.salesOrder.findFirst({
+              where: { id: order.id, branch: { businessId } }
+            });
 
             if (!existingOrder) {
               if (order.customerId) {
-                const cExists = await tx.customer.findUnique({ where: { id: order.customerId } });
+                const cExists = await tx.customer.findFirst({
+                  where: { id: order.customerId, businessId }
+                });
                 if (!cExists) {
                   await tx.customer.create({
                     data: { id: order.customerId, businessId, name: `Imported Customer (${order.customerId.slice(0, 8)})` }
@@ -315,7 +349,9 @@ export class SyncController {
 
               for (const item of order.items || []) {
                 if (!item.productId) continue;
-                const pExists = await tx.product.findUnique({ where: { id: item.productId } });
+                const pExists = await tx.product.findFirst({
+                  where: { id: item.productId, businessId }
+                });
                 if (!pExists) {
                   await tx.product.create({
                     data: { id: item.productId, businessId, sku: `IMP-${item.productId.slice(0,6)}`, name: `Imported Product (${item.productId.slice(0,6)})`, costPrice: 0, sellingPrice: 0 }
@@ -340,14 +376,18 @@ export class SyncController {
           }
         }
 
-        // 6. Process Payments
+        // 6. Process Payments (Scope check by businessId)
         for (const payment of payments) {
           try {
-            const existingPayment = await tx.customerPayment.findUnique({ where: { id: payment.id } });
+            const existingPayment = await tx.customerPayment.findFirst({
+              where: { id: payment.id, businessId }
+            });
 
             if (!existingPayment) {
               if (payment.customerId) {
-                const cExists = await tx.customer.findUnique({ where: { id: payment.customerId } });
+                const cExists = await tx.customer.findFirst({
+                  where: { id: payment.customerId, businessId }
+                });
                 if (!cExists) {
                   await tx.customer.create({
                     data: { id: payment.customerId, businessId, name: `Imported Customer (${payment.customerId.slice(0, 8)})` }
@@ -374,14 +414,18 @@ export class SyncController {
           }
         }
 
-        // 7. Process Inventory Movements
+        // 7. Process Inventory Movements (Scope check by branch's businessId)
         for (const movement of inventoryMovements) {
           try {
-            const existingMovement = await tx.inventoryMovement.findUnique({ where: { id: movement.id } });
+            const existingMovement = await tx.inventoryMovement.findFirst({
+              where: { id: movement.id, branch: { businessId } }
+            });
 
             if (!existingMovement) {
               if (movement.productId) {
-                const pExists = await tx.product.findUnique({ where: { id: movement.productId } });
+                const pExists = await tx.product.findFirst({
+                  where: { id: movement.productId, businessId }
+                });
                 if (!pExists) {
                   await tx.product.create({
                     data: { id: movement.productId, businessId, sku: `IMP-${movement.productId.slice(0,6)}`, name: `Imported Product (${movement.productId.slice(0,6)})`, costPrice: 0, sellingPrice: 0 }
@@ -409,51 +453,83 @@ export class SyncController {
           }
         }
 
-        // 8. Process Branches
+        // 8. Process Branches (Scope check by businessId)
         for (const branch of branches) {
           try {
-            await tx.branch.upsert({
-              where: { id: branch.id },
-              update: {
-                name: branch.name,
-                location: branch.location || null,
-                isActive: branch.isActive !== undefined ? branch.isActive : true,
-              },
-              create: {
-                id: branch.id,
-                businessId,
-                name: branch.name,
-                location: branch.location || null,
-                isActive: branch.isActive !== undefined ? branch.isActive : true,
-              },
+            const existing = await tx.branch.findFirst({
+              where: { id: branch.id, businessId }
             });
+
+            if (existing) {
+              await tx.branch.update({
+                where: { id: existing.id },
+                data: {
+                  name: branch.name,
+                  location: branch.location || null,
+                  isActive: branch.isActive !== undefined ? branch.isActive : true,
+                },
+              });
+            } else {
+              await tx.branch.create({
+                data: {
+                  id: branch.id,
+                  businessId,
+                  name: branch.name,
+                  location: branch.location || null,
+                  isActive: branch.isActive !== undefined ? branch.isActive : true,
+                },
+              });
+            }
             syncedBranchIds.push(branch.id);
           } catch (err: any) {
             pushFailure(branch.id, 'branch', 'BRANCH_UPSERT_FAILED', err.message);
           }
         }
 
-        // 9. Process Users
+        // 9. Process Users (Strict ownership check & Bcrypt Password Hashing)
         for (const user of users) {
           try {
-            await tx.user.upsert({
-              where: { id: user.id },
-              update: {
-                username: user.username,
-                role: user.role,
-                branchId: user.branchId || null,
-              },
-              create: {
-                id: user.id,
-                username: user.username,
-                passwordHash: user.password || 'default123',
-                role: user.role || 'CASHIER',
-                fullName: user.fullName || user.username,
-                phoneNumber: user.phoneNumber || '',
-                branchId: user.branchId || null,
-                businessId: user.businessId || businessId,
-              },
+            const existing = await tx.user.findFirst({
+              where: { id: user.id, businessId }
             });
+
+            if (existing) {
+              // Role modifications during sync require OWNER or SUPERADMIN privilege
+              const roleToUpdate = (userRole === 'OWNER' || userRole === 'SUPERADMIN') ? (user.role || existing.role) : existing.role;
+
+              const updateData: any = {
+                username: user.username || existing.username,
+                role: roleToUpdate,
+                branchId: user.branchId || existing.branchId,
+              };
+
+              // If client supplied a new password, hash it properly using bcrypt
+              if (user.password && user.password !== 'default123') {
+                updateData.passwordHash = bcrypt.hashSync(user.password, 10);
+              }
+
+              await tx.user.update({
+                where: { id: existing.id },
+                data: updateData,
+              });
+            } else {
+              // Create new user scoped strictly to caller's businessId with bcrypt hashed password
+              const rawPassword = (user.password && user.password !== 'default123') ? user.password : `Pass_${Math.random().toString(36).slice(2, 8)}`;
+              const hashedPass = bcrypt.hashSync(rawPassword, 10);
+
+              await tx.user.create({
+                data: {
+                  id: user.id,
+                  username: user.username,
+                  passwordHash: hashedPass,
+                  role: user.role || 'CASHIER',
+                  fullName: user.fullName || user.username,
+                  phoneNumber: user.phoneNumber || '',
+                  branchId: user.branchId || null,
+                  businessId, // Enforce authenticated businessId
+                },
+              });
+            }
             syncedUserIds.push(user.id);
           } catch (err: any) {
             pushFailure(user.id, 'user', 'USER_UPSERT_FAILED', err.message);
@@ -504,3 +580,4 @@ export class SyncController {
     };
   }
 }
+
