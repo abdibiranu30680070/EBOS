@@ -558,10 +558,31 @@ export default function App() {
         </div>
       </header>
 
+      <nav className="bg-white border-b border-slate-200 px-4 sm:px-6 flex gap-1 overflow-x-auto" aria-label="Main navigation">
+        {[
+          { id: 'dashboard', label: 'Dashboard' },
+          { id: 'pos', label: 'Checkout POS' },
+          { id: 'inventory', label: 'Inventory' },
+          { id: 'customers', label: 'Customers & Credit' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            onClick={() => { setActiveTab(item.id as typeof activeTab); setSyncMessage(null); }}
+            className={`shrink-0 px-4 py-3 border-b-2 text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === item.id
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
       {/* Main Layout Grid */}
       <div className="flex flex-1">
         {/* Navigation Sidebar */}
-        <aside className="w-64 bg-white border-r border-slate-200 p-4 flex flex-col justify-between shrink-0">
+        <aside className="hidden">
           <div className="space-y-1">
             <div
               className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer transition-colors text-sm ${
