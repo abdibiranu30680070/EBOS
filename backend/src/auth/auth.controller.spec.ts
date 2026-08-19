@@ -1,8 +1,8 @@
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 
 jest.mock(
-  '@prisma/adapter-better-sqlite3',
-  () => ({ PrismaBetterSqlite3: class PrismaBetterSqlite3 {} }),
+  '@prisma/adapter-pg',
+  () => ({ PrismaPg: class PrismaPg {} }),
   { virtual: true },
 );
 

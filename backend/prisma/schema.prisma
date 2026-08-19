@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Business {
@@ -191,7 +191,7 @@ model AuditLog {
   id        String   @id
   userId    String?  @map("user_id")
   action    String
-  payload   String? // Store json as string for SQLite compatibility
+  payload   String?
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("audit_logs")
