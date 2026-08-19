@@ -28,7 +28,6 @@ export function PosSalesOrderForm({
 
   // Selected customer object for credit debt checking
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
-  const selectedCustomerDebt = Math.max(0, Number(selectedCustomer?.outstandingBalance || 0));
 
   // Line actions
   const addLine = () => {
@@ -77,18 +76,7 @@ export function PosSalesOrderForm({
   };
 
   const handleConfirmOrder = (e) => {
-    console.log('handleConfirmOrder called', { paidAmount, cartTotal, selectedCustomerId, paymentMode, validLines });
     e.preventDefault();
-    
-    // Validate customer selection for partial payments
-    if (paidAmount < cartTotal && !selectedCustomerId) {
-      const remaining = cartTotal - paidAmount;
-      console.log('Customer validation failed - no customer selected for partial payment');
-      onCheckout({ error: `Customer Account Required: Paying less than total (ETB ${remaining.toLocaleString()} remaining) requires selecting a Customer account to save as credit.` });
-      return;
-    }
-    
-    console.log('Creating formatted payload');
     const formattedPayload = validLines.map(line => {
       const prod = products.find(p => p.id === line.productId);
       return {
@@ -99,7 +87,6 @@ export function PosSalesOrderForm({
         unitPrice: Number(line.unitPrice) || 0,
       };
     });
-    console.log('Calling onCheckout with payload:', formattedPayload);
     onCheckout(formattedPayload);
   };
 
@@ -156,7 +143,7 @@ export function PosSalesOrderForm({
                 ))}
               </select>
 
-              {selectedCustomer && selectedCustomerDebt > 0 && (
+              {selectedCustomer && selectedCustomer.outstandingBalance > 0 && (
                 <button
                   type="button"
                   onClick={() => onShowCollectPayment(selectedCustomer)}
@@ -204,14 +191,14 @@ export function PosSalesOrderForm({
             <span className="text-slate-500 font-bold">{validLines.length} line{validLines.length !== 1 ? 's' : ''} configured</span>
           </div>
 
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-slate-200 overflow-y-auto max-h-[360px]">
             {lines.map((line, index) => {
               const subtotal = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0);
               const selectedProd = products.find(p => p.id === line.productId);
               const currentStock  = selectedProd ? (stockBalances[selectedProd.id] || 0) : null;
 
               return (
-                <div key={line.id} className="p-3 bg-white flex flex-col sm:flex-row items-center gap-3 hover:bg-slate-50/80 transition-colors relative focus-within:z-50">
+                <div key={line.id} className="p-3 bg-white flex flex-col sm:flex-row items-center gap-3 hover:bg-slate-50/80 transition-colors">
                   
                   {/* Line Index */}
                   <span className="text-xs font-extrabold text-slate-400 w-6 shrink-0 text-center">{index + 1}</span>
@@ -288,7 +275,7 @@ export function PosSalesOrderForm({
           </div>
 
           {/* Odoo Style "Add a line" Action Bar */}
-          <div className="p-3 bg-slate-100/70 border-t border-slate-200 relative z-0">
+          <div className="p-3 bg-slate-100/70 border-t border-slate-200">
             <button
               type="button"
               onClick={addLine}

@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
 }
 
 model Business {
@@ -20,7 +20,6 @@ model Business {
   products  Product[]
   customers Customer[]
   payments  CustomerPayment[]
-  suppliers Supplier[]
 
   @@map("businesses")
 }
@@ -37,7 +36,6 @@ model Branch {
   users              User[]
   inventoryMovements InventoryMovement[]
   salesOrders        SalesOrder[]
-  purchaseOrders     PurchaseOrder[]
 
   @@map("branches")
 }
@@ -87,7 +85,6 @@ model Product {
   updatedAt          DateTime            @updatedAt @map("updated_at")
   inventoryMovements InventoryMovement[]
   salesOrderItems    SalesOrderItem[]
-  purchaseOrderItems PurchaseOrderItem[]
 
   @@unique([businessId, sku])
   @@map("products")
@@ -198,48 +195,4 @@ model AuditLog {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("audit_logs")
-}
-
-model Supplier {
-  id         String   @id
-  businessId String   @map("business_id")
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  name       String
-  phone      String?
-  email      String?
-  address    String?
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  purchaseOrders PurchaseOrder[]
-
-  @@map("suppliers")
-}
-
-model PurchaseOrder {
-  id          String   @id
-  branchId    String   @map("branch_id")
-  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  supplierId  String   @map("supplier_id")
-  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  totalAmount Decimal  @default(0.0000) @map("total_amount")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  items PurchaseOrderItem[]
-
-  @@map("purchase_orders")
-}
-
-model PurchaseOrderItem {
-  id        String        @id
-  orderId   String        @map("order_id")
-  order     PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String        @map("product_id")
-  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  quantity  Decimal       @default(0.0000)
-  unitPrice Decimal       @default(0.0000) @map("unit_price")
-  totalPrice Decimal      @default(0.0000) @map("total_price")
-
-  @@map("purchase_order_items")
 }

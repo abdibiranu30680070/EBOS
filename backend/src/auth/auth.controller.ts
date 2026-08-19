@@ -1,6 +1,19 @@
-import { Controller, Post, Get, Body, Query, UnauthorizedException, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  UnauthorizedException,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('api/v1/auth')
 export class AuthController {
@@ -9,11 +22,16 @@ export class AuthController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @UseGuards(JwtAuthGuard)
   @Get('users')
-  async getUsers(@Query('businessId') businessId?: string, @Query('branchId') branchId?: string) {
+  async getUsers(@Request() req: any, @Query('branchId') requestedBranchId?: string) {
+    const { businessId, branchId: authenticatedBranchId } = req.user;
     if (!businessId) {
       return [];
     }
+
+    // A branch user cannot widen the result set by supplying another branch ID.
+    const branchId = authenticatedBranchId ?? requestedBranchId;
 
     const users = await this.prisma.user.findMany({
       where: {
