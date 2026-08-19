@@ -41,7 +41,7 @@ import { PurchasesPage }      from './features/purchases/PurchasesPage.jsx';
 function useAppData(user) {
   const busId = user?.businessId;
   const products  = useLiveQuery(
-    () => busId ? db.products.filter(p => p.businessId === busId && p.isActive === 1).toArray() : [],
+    () => busId ? db.products.filter(p => p.businessId === busId && (p.isActive === 1 || p.isActive === true)).toArray() : [],
     [busId]
   ) || [];
   const customers = useLiveQuery(
