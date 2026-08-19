@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-// NOTE: don't import generated enum types directly; fall back to runtime values/casts
 
 @Controller('api/v1/sync')
 @UseGuards(JwtAuthGuard)
@@ -15,11 +14,10 @@ export class SyncController {
     if (!businessId) {
       return {
         serverTime: new Date().toISOString(),
-        changes: { products: [], customers: [], inventoryMovements: [], salesOrders: [], payments: [], suppliers: [], purchaseOrders: [] }
+        changes: { products: [], customers: [], inventoryMovements: [], salesOrders: [], payments: [], suppliers: [], purchaseOrders: [], branches: [], users: [] }
       };
     }
 
-    // Handle empty or invalid lastSyncedAt
     const lastSyncedAt = lastSyncedAtStr && !isNaN(Date.parse(lastSyncedAtStr)) 
       ? new Date(lastSyncedAtStr) 
       : new Date(0);
@@ -27,91 +25,80 @@ export class SyncController {
     const branchFilter = branchId ? { branchId } : { branch: { businessId } };
 
     const products = await this.prisma.product.findMany({
-      where: {
-        businessId,
-        updatedAt: { gt: lastSyncedAt },
-      },
+      where: { businessId, updatedAt: { gt: lastSyncedAt } },
     }).catch(err => {
       console.warn('[SyncPull] Error fetching products:', err.message);
       return [];
     });
 
     const customers = await this.prisma.customer.findMany({
-      where: {
-        businessId,
-        updatedAt: { gt: lastSyncedAt },
-      },
+      where: { businessId, updatedAt: { gt: lastSyncedAt } },
     }).catch(err => {
       console.warn('[SyncPull] Error fetching customers:', err.message);
       return [];
     });
 
     const inventoryMovements = await this.prisma.inventoryMovement.findMany({
-      where: {
-        ...branchFilter,
-        createdAt: { gt: lastSyncedAt },
-      },
+      where: { ...branchFilter, createdAt: { gt: lastSyncedAt } },
     }).catch(err => {
       console.warn('[SyncPull] Error fetching inventoryMovements:', err.message);
       return [];
     });
 
     const salesOrders = await this.prisma.salesOrder.findMany({
-      where: {
-        ...branchFilter,
-        updatedAt: { gt: lastSyncedAt },
-      },
-      include: {
-        items: true,
-      },
+      where: { ...branchFilter, updatedAt: { gt: lastSyncedAt } },
+      include: { items: true },
     }).catch(err => {
       console.warn('[SyncPull] Error fetching salesOrders:', err.message);
       return [];
     });
 
     const payments = await this.prisma.customerPayment.findMany({
-      where: {
-        businessId,
-        createdAt: { gt: lastSyncedAt },
-      },
+      where: { businessId, createdAt: { gt: lastSyncedAt } },
     }).catch(err => {
       console.warn('[SyncPull] Error fetching payments:', err.message);
       return [];
     });
 
     const suppliers = await this.prisma.supplier.findMany({
-      where: {
-        businessId,
-        updatedAt: { gt: lastSyncedAt },
-      },
+      where: { businessId, updatedAt: { gt: lastSyncedAt } },
     }).catch(err => {
-      console.warn('[SyncPull] Error fetching suppliers (table may be missing):', err.message);
+      console.warn('[SyncPull] Error fetching suppliers:', err.message);
       return [];
     });
 
     const purchaseOrders = await this.prisma.purchaseOrder.findMany({
-      where: {
-        ...branchFilter,
-        updatedAt: { gt: lastSyncedAt },
-      },
-      include: {
-        items: true,
-      },
+      where: { ...branchFilter, updatedAt: { gt: lastSyncedAt } },
+      include: { items: true },
     }).catch(err => {
-      console.warn('[SyncPull] Error fetching purchaseOrders (table may be missing):', err.message);
+      console.warn('[SyncPull] Error fetching purchaseOrders:', err.message);
+      return [];
+    });
+
+    const branches = await this.prisma.branch.findMany({
+      where: { businessId, updatedAt: { gt: lastSyncedAt } },
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching branches:', err.message);
+      return [];
+    });
+
+    const users = await this.prisma.user.findMany({
+      where: { businessId, updatedAt: { gt: lastSyncedAt } },
+      select: {
+        id: true, businessId: true, branchId: true, username: true,
+        role: true, fullName: true, phoneNumber: true, isActive: true,
+        createdAt: true, updatedAt: true,
+      }
+    }).catch(err => {
+      console.warn('[SyncPull] Error fetching users:', err.message);
       return [];
     });
 
     return {
       serverTime: new Date().toISOString(),
       changes: {
-        products,
-        customers,
-        inventoryMovements,
-        salesOrders,
-        payments,
-        suppliers,
-        purchaseOrders,
+        products, customers, inventoryMovements, salesOrders,
+        payments, suppliers, purchaseOrders, branches, users,
       },
     };
   }
@@ -121,7 +108,6 @@ export class SyncController {
     const { businessId, sub: userId } = req.user;
     let { branchId } = req.user;
 
-    // If branchId is missing from JWT, resolve it from the database
     if (!branchId) {
       const branch = await this.prisma.branch.findFirst({
         where: { businessId },
@@ -130,234 +116,380 @@ export class SyncController {
       branchId = branch?.id || null;
     }
 
-    const { 
-      customers = [], 
-      salesOrders = [], 
-      inventoryMovements = [], 
-      payments = [],
-      suppliers = [],
-      purchaseOrders = []
+    const {
+      products = [], customers = [], salesOrders = [],
+      inventoryMovements = [], payments = [], suppliers = [],
+      purchaseOrders = [], branches = [], users = []
     } = body;
 
+    const failed: Array<{ id: string; type: string; reason: string; details?: string }> = [];
     let results: any;
+
     try {
       results = await this.prisma.$transaction(async (tx: any) => {
-      const syncedCustomerIds: string[] = [];
-      const syncedOrderIds: string[] = [];
-      const syncedMovementIds: string[] = [];
-      const syncedPaymentIds: string[] = [];
-      const syncedSupplierIds: string[] = [];
-      const syncedPurchaseOrderIds: string[] = [];
+        const syncedProductIds: string[] = [];
+        const syncedCustomerIds: string[] = [];
+        const syncedOrderIds: string[] = [];
+        const syncedMovementIds: string[] = [];
+        const syncedPaymentIds: string[] = [];
+        const syncedSupplierIds: string[] = [];
+        const syncedPurchaseOrderIds: string[] = [];
+        const syncedBranchIds: string[] = [];
+        const syncedUserIds: string[] = [];
 
-      // Process Suppliers
-      for (const supplier of suppliers) {
-        await tx.supplier.upsert({
-          where: { id: supplier.id },
-          update: {
-            name: supplier.name,
-            phone: supplier.phone || null,
-            email: supplier.email || null,
-            address: supplier.address || null,
-          },
-          create: {
-            id: supplier.id,
-            businessId,
-            name: supplier.name,
-            phone: supplier.phone || null,
-            email: supplier.email || null,
-            address: supplier.address || null,
-          },
-        });
-        syncedSupplierIds.push(supplier.id);
-      }
+        const pushFailure = (id: string, type: string, reason: string, details?: string) => {
+          failed.push({ id, type, reason, details });
+        };
 
-      // Process Purchase Orders
-      for (const po of purchaseOrders) {
-        const existingPo = await tx.purchaseOrder.findUnique({
-          where: { id: po.id },
-        });
+        // 1. Process Products (upsert with SKU collision handling)
+        for (const product of products) {
+          try {
+            const existing = await tx.product.findFirst({
+              where: {
+                businessId,
+                OR: [{ id: product.id }, { sku: product.sku }]
+              }
+            });
 
-        if (!existingPo) {
-          await tx.purchaseOrder.create({
-            data: {
-              id: po.id,
-              branchId,
-              supplierId: po.supplierId,
-              createdAt: new Date(po.createdAt),
-            },
-          });
+            const targetId = existing ? existing.id : product.id;
 
-          for (const item of po.items || []) {
-            await tx.purchaseOrderItem.create({
-              data: {
-                id: item.id,
-                orderId: po.id,
-                productId: item.productId,
+            await tx.product.upsert({
+              where: { id: targetId },
+              update: {
+                sku: product.sku,
+                name: product.name,
+                costPrice: product.costPrice,
+                sellingPrice: product.sellingPrice,
+                minStockLevel: product.minStockLevel || 0,
+                unitOfMeasure: product.unitOfMeasure || 'Pcs',
+                isActive: product.isActive !== undefined ? product.isActive : true,
+              },
+              create: {
+                id: product.id,
+                businessId,
+                sku: product.sku,
+                name: product.name,
+                costPrice: product.costPrice,
+                sellingPrice: product.sellingPrice,
+                minStockLevel: product.minStockLevel || 0,
+                unitOfMeasure: product.unitOfMeasure || 'Pcs',
+                isActive: product.isActive !== undefined ? product.isActive : true,
               },
             });
+            syncedProductIds.push(product.id);
+          } catch (err: any) {
+            pushFailure(product.id, 'product', 'PRODUCT_UPSERT_FAILED', err.message);
           }
         }
-        syncedPurchaseOrderIds.push(po.id);
-      }
 
-      // Process Customers
-      for (const customer of customers) {
-        await tx.customer.upsert({
-          where: { id: customer.id },
-          update: {
-            name: customer.name,
-            phone: customer.phone,
-            creditLimit: customer.creditLimit,
-            outstandingBalance: customer.outstandingBalance,
-          },
-          create: {
-            id: customer.id,
-            businessId,
-            name: customer.name,
-            phone: customer.phone,
-            creditLimit: customer.creditLimit,
-            outstandingBalance: customer.outstandingBalance,
-          },
-        });
-        syncedCustomerIds.push(customer.id);
-      }
-
-      // Process Sales Orders
-      for (const order of salesOrders) {
-        // Check if the order already exists to avoid duplicate logic
-        const existingOrder = await tx.salesOrder.findUnique({
-          where: { id: order.id },
-        });
-
-        if (!existingOrder) {
-          // Create new order
-          await tx.salesOrder.create({
-            data: {
-              id: order.id,
-              branchId,
-              customerId: order.customerId || null,
-              userId: userId,
-              totalAmount: order.totalAmount,
-              discountAmount: order.discountAmount || 0,
-              paidAmount: order.paidAmount || 0,
-              paymentMode: order.paymentMode as any,
-              createdAt: new Date(order.createdAt),
-            },
-          });
-
-          // Create order items
-          for (const item of order.items || []) {
-            await tx.salesOrderItem.create({
-              data: {
-                id: item.id,
-                orderId: order.id,
-                productId: item.productId,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice,
+        // 2. Process Suppliers (upsert)
+        for (const supplier of suppliers) {
+          try {
+            await tx.supplier.upsert({
+              where: { id: supplier.id },
+              update: {
+                name: supplier.name,
+                phone: supplier.phone || null,
+                email: supplier.email || null,
+                address: supplier.address || null,
+              },
+              create: {
+                id: supplier.id,
+                businessId,
+                name: supplier.name,
+                phone: supplier.phone || null,
+                email: supplier.email || null,
+                address: supplier.address || null,
               },
             });
+            syncedSupplierIds.push(supplier.id);
+          } catch (err: any) {
+            pushFailure(supplier.id, 'supplier', 'SUPPLIER_UPSERT_FAILED', err.message);
           }
+        }
 
-          // If credit sale, update customer outstanding balance
-          if (order.paymentMode === 'CREDIT' && order.customerId) {
-            const creditAmount = Number(order.totalAmount) - Number(order.discountAmount) - Number(order.paidAmount);
-            if (creditAmount > 0) {
-              await tx.customer.update({
-                where: { id: order.customerId },
+        // 3. Process Customers (upsert)
+        for (const customer of customers) {
+          try {
+            await tx.customer.upsert({
+              where: { id: customer.id },
+              update: {
+                name: customer.name,
+                phone: customer.phone || null,
+                creditLimit: customer.creditLimit ?? 0,
+                outstandingBalance: customer.outstandingBalance ?? 0,
+              },
+              create: {
+                id: customer.id,
+                businessId,
+                name: customer.name,
+                phone: customer.phone || null,
+                creditLimit: customer.creditLimit ?? 0,
+                outstandingBalance: customer.outstandingBalance ?? 0,
+              },
+            });
+            syncedCustomerIds.push(customer.id);
+          } catch (err: any) {
+            pushFailure(customer.id, 'customer', 'CUSTOMER_UPSERT_FAILED', err.message);
+          }
+        }
+
+        // 4. Process Purchase Orders
+        for (const po of purchaseOrders) {
+          try {
+            const existingPo = await tx.purchaseOrder.findUnique({ where: { id: po.id } });
+            if (!existingPo) {
+              if (po.supplierId) {
+                const sExists = await tx.supplier.findUnique({ where: { id: po.supplierId } });
+                if (!sExists) {
+                  await tx.supplier.create({
+                    data: { id: po.supplierId, businessId, name: `Imported Supplier (${po.supplierId.slice(0, 8)})` }
+                  });
+                }
+              }
+
+              await tx.purchaseOrder.create({
                 data: {
-                  outstandingBalance: {
-                    increment: creditAmount,
+                  id: po.id,
+                  branchId,
+                  supplierId: po.supplierId,
+                  totalAmount: po.totalAmount ?? 0,
+                  createdAt: new Date(po.createdAt),
+                },
+              });
+
+              for (const item of po.items || []) {
+                if (!item.productId) continue;
+                const pExists = await tx.product.findUnique({ where: { id: item.productId } });
+                if (!pExists) {
+                  await tx.product.create({
+                    data: { id: item.productId, businessId, sku: `IMP-${item.productId.slice(0,6)}`, name: `Imported Item (${item.productId.slice(0,6)})`, costPrice: 0, sellingPrice: 0 }
+                  });
+                }
+                await tx.purchaseOrderItem.create({
+                  data: {
+                    id: item.id,
+                    orderId: po.id,
+                    productId: item.productId,
+                    quantity: item.quantity ?? 0,
+                    unitPrice: item.unitPrice ?? 0,
+                    totalPrice: item.totalPrice ?? 0,
                   },
+                });
+              }
+            }
+            syncedPurchaseOrderIds.push(po.id);
+          } catch (err: any) {
+            pushFailure(po.id, 'purchaseOrder', 'PO_CREATE_FAILED', err.message);
+          }
+        }
+
+        // 5. Process Sales Orders
+        for (const order of salesOrders) {
+          try {
+            const existingOrder = await tx.salesOrder.findUnique({ where: { id: order.id } });
+
+            if (!existingOrder) {
+              if (order.customerId) {
+                const cExists = await tx.customer.findUnique({ where: { id: order.customerId } });
+                if (!cExists) {
+                  await tx.customer.create({
+                    data: { id: order.customerId, businessId, name: `Imported Customer (${order.customerId.slice(0, 8)})` }
+                  });
+                }
+              }
+
+              await tx.salesOrder.create({
+                data: {
+                  id: order.id,
+                  branchId,
+                  customerId: order.customerId || null,
+                  userId: userId,
+                  totalAmount: order.totalAmount,
+                  discountAmount: order.discountAmount || 0,
+                  paidAmount: order.paidAmount || 0,
+                  paymentMode: order.paymentMode as any,
+                  createdAt: new Date(order.createdAt),
+                },
+              });
+
+              for (const item of order.items || []) {
+                if (!item.productId) continue;
+                const pExists = await tx.product.findUnique({ where: { id: item.productId } });
+                if (!pExists) {
+                  await tx.product.create({
+                    data: { id: item.productId, businessId, sku: `IMP-${item.productId.slice(0,6)}`, name: `Imported Product (${item.productId.slice(0,6)})`, costPrice: 0, sellingPrice: 0 }
+                  });
+                }
+
+                await tx.salesOrderItem.create({
+                  data: {
+                    id: item.id,
+                    orderId: order.id,
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    totalPrice: item.totalPrice,
+                  },
+                });
+              }
+            }
+            syncedOrderIds.push(order.id);
+          } catch (err: any) {
+            pushFailure(order.id, 'salesOrder', 'SALES_ORDER_FAILED', err.message);
+          }
+        }
+
+        // 6. Process Payments
+        for (const payment of payments) {
+          try {
+            const existingPayment = await tx.customerPayment.findUnique({ where: { id: payment.id } });
+
+            if (!existingPayment) {
+              if (payment.customerId) {
+                const cExists = await tx.customer.findUnique({ where: { id: payment.customerId } });
+                if (!cExists) {
+                  await tx.customer.create({
+                    data: { id: payment.customerId, businessId, name: `Imported Customer (${payment.customerId.slice(0, 8)})` }
+                  });
+                }
+              }
+
+              await tx.customerPayment.create({
+                data: {
+                  id: payment.id,
+                  businessId,
+                  customerId: payment.customerId,
+                  amount: payment.amount,
+                  paymentMode: payment.paymentMode as any,
+                  referenceNumber: payment.referenceNumber || null,
+                  createdById: userId,
+                  createdAt: new Date(payment.createdAt),
                 },
               });
             }
+            syncedPaymentIds.push(payment.id);
+          } catch (err: any) {
+            pushFailure(payment.id, 'payment', 'PAYMENT_FAILED', err.message);
           }
         }
-        syncedOrderIds.push(order.id);
-      }
 
-      // Process Payments
-      for (const payment of payments) {
-        const existingPayment = await tx.customerPayment.findUnique({
-          where: { id: payment.id },
-        });
+        // 7. Process Inventory Movements
+        for (const movement of inventoryMovements) {
+          try {
+            const existingMovement = await tx.inventoryMovement.findUnique({ where: { id: movement.id } });
 
-        if (!existingPayment) {
-          await tx.customerPayment.create({
-            data: {
-              id: payment.id,
-              businessId,
-              customerId: payment.customerId,
-              amount: payment.amount,
-              paymentMode: payment.paymentMode as any,
-              referenceNumber: payment.referenceNumber || null,
-              createdById: userId,
-              createdAt: new Date(payment.createdAt),
-            },
-          });
+            if (!existingMovement) {
+              if (movement.productId) {
+                const pExists = await tx.product.findUnique({ where: { id: movement.productId } });
+                if (!pExists) {
+                  await tx.product.create({
+                    data: { id: movement.productId, businessId, sku: `IMP-${movement.productId.slice(0,6)}`, name: `Imported Product (${movement.productId.slice(0,6)})`, costPrice: 0, sellingPrice: 0 }
+                  });
+                }
+              }
 
-          // Deduct from customer's outstanding balance
-          await tx.customer.update({
-            where: { id: payment.customerId },
-            data: {
-              outstandingBalance: {
-                decrement: payment.amount,
+              await tx.inventoryMovement.create({
+                data: {
+                  id: movement.id,
+                  branchId,
+                  productId: movement.productId,
+                  quantityDelta: movement.quantityDelta,
+                  type: movement.type as any,
+                  referenceId: movement.referenceId || null,
+                  notes: movement.notes || null,
+                  createdById: userId,
+                  createdAt: new Date(movement.createdAt),
+                },
+              });
+            }
+            syncedMovementIds.push(movement.id);
+          } catch (err: any) {
+            pushFailure(movement.id, 'inventory', 'MOVEMENT_FAILED', err.message);
+          }
+        }
+
+        // 8. Process Branches
+        for (const branch of branches) {
+          try {
+            await tx.branch.upsert({
+              where: { id: branch.id },
+              update: {
+                name: branch.name,
+                location: branch.location || null,
+                isActive: branch.isActive !== undefined ? branch.isActive : true,
               },
-            },
-          });
+              create: {
+                id: branch.id,
+                businessId,
+                name: branch.name,
+                location: branch.location || null,
+                isActive: branch.isActive !== undefined ? branch.isActive : true,
+              },
+            });
+            syncedBranchIds.push(branch.id);
+          } catch (err: any) {
+            pushFailure(branch.id, 'branch', 'BRANCH_UPSERT_FAILED', err.message);
+          }
         }
-        syncedPaymentIds.push(payment.id);
-      }
 
-      // Process Inventory Movements
-      for (const movement of inventoryMovements) {
-        const existingMovement = await tx.inventoryMovement.findUnique({
-          where: { id: movement.id },
+        // 9. Process Users
+        for (const user of users) {
+          try {
+            await tx.user.upsert({
+              where: { id: user.id },
+              update: {
+                username: user.username,
+                role: user.role,
+                branchId: user.branchId || null,
+              },
+              create: {
+                id: user.id,
+                username: user.username,
+                passwordHash: user.password || 'default123',
+                role: user.role || 'CASHIER',
+                fullName: user.fullName || user.username,
+                phoneNumber: user.phoneNumber || '',
+                branchId: user.branchId || null,
+                businessId: user.businessId || businessId,
+              },
+            });
+            syncedUserIds.push(user.id);
+          } catch (err: any) {
+            pushFailure(user.id, 'user', 'USER_UPSERT_FAILED', err.message);
+          }
+        }
+
+        await tx.auditLog.create({
+          data: {
+            id: `aud_${Date.now()}`,
+            userId,
+            action: 'SYNC_PUSH',
+            payload: JSON.stringify({
+              productsCount: products.length,
+              ordersCount: salesOrders.length,
+              movementsCount: inventoryMovements.length,
+              paymentsCount: payments.length,
+              suppliersCount: suppliers.length,
+              poCount: purchaseOrders.length,
+              branchesCount: branches.length,
+              usersCount: users.length,
+              failedCount: failed.length,
+            }),
+          },
         });
 
-        if (!existingMovement) {
-          await tx.inventoryMovement.create({
-            data: {
-              id: movement.id,
-              branchId,
-              productId: movement.productId,
-              quantityDelta: movement.quantityDelta,
-              type: movement.type as any,
-              referenceId: movement.referenceId || null,
-              notes: movement.notes || null,
-              createdById: userId,
-              createdAt: new Date(movement.createdAt),
-            },
-          });
-        }
-        syncedMovementIds.push(movement.id);
-      }
-
-      // Add Audit Log
-      await tx.auditLog.create({
-        data: {
-          id: `aud_${Date.now()}`,
-          userId,
-          action: 'SYNC_PUSH',
-          payload: JSON.stringify({
-            ordersCount: salesOrders.length,
-            movementsCount: inventoryMovements.length,
-            paymentsCount: payments.length,
-            suppliersCount: suppliers.length,
-            poCount: purchaseOrders.length,
-          }),
-        },
-      });
-
-      return {
-        customers: syncedCustomerIds,
-        salesOrders: syncedOrderIds,
-        inventoryMovements: syncedMovementIds,
-        payments: syncedPaymentIds,
-        suppliers: syncedSupplierIds,
-        purchaseOrders: syncedPurchaseOrderIds,
-      };
+        return {
+          products: syncedProductIds,
+          customers: syncedCustomerIds,
+          salesOrders: syncedOrderIds,
+          inventoryMovements: syncedMovementIds,
+          payments: syncedPaymentIds,
+          suppliers: syncedSupplierIds,
+          purchaseOrders: syncedPurchaseOrderIds,
+          branches: syncedBranchIds,
+          users: syncedUserIds,
+        };
       });
     } catch (err: any) {
       console.error('[SyncPush] Transaction failed:', err?.message || err);
@@ -367,6 +499,7 @@ export class SyncController {
     return {
       success: true,
       synced: results,
+      failed,
       serverTime: new Date().toISOString(),
     };
   }
