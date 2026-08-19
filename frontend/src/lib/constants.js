@@ -7,19 +7,7 @@ const getEnvApiUrl = () => {
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
   }
-  if (typeof window !== 'undefined') {
-    // If Capacitor is present or we are running in a production build, point to the cloud server
-    if (window.Capacitor || import.meta.env.PROD) {
-      return 'https://ebos-glzg.onrender.com';
-    }
-    // Local dev: only fallback to localhost:3000 if we are on localhost and using Vite dev server (port 5173)
-    if (
-      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
-      window.location.port === '5173'
-    ) {
-      return 'http://localhost:3000';
-    }
-  }
+  // Always default to deployed Render cloud server
   return 'https://ebos-glzg.onrender.com';
 };
 
