@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type LocalProduct, type LocalSalesOrder } from './db';
 import { syncNow, startAutoSync, stopAutoSync } from './syncEngine';
+import { API_BASE_URL } from './lib/constants.js';
 
 // Utility for collision-free local ID generation
 const generateId = (prefix: string) => {
@@ -111,7 +112,7 @@ export default function App() {
     // If online, login via backend API
     if (isOnline) {
       try {
-        const res = await fetch('http://localhost:3000/api/v1/auth/login', {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

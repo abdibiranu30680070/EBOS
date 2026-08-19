@@ -1,6 +1,5 @@
 import { db } from './db';
-
-const API_BASE_URL = 'http://localhost:3000'; // Default NestJS server URL
+import { API_BASE_URL } from './lib/constants.js';
 
 // Helper to get Authorization headers
 function getAuthHeaders(): Record<string, string> {
